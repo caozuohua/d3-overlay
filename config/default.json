@@ -1,0 +1,56 @@
+{
+  "overlay": {
+    "opacity": 0.85,
+    "position": "top-right",
+    "font_size": 14,
+    "theme": "dark",
+    "click_through": true,
+    "follow_game_window": true
+  },
+  "hotkeys": {
+    "toggle_overlay": "F8",
+    "toggle_timer": "F9",
+    "cycle_layout": "F10",
+    "settings": "F11"
+  },
+  "data": {
+    "battle_tag": "",
+    "region": "us",
+    "access_token": "",
+    "log_path": "auto",
+    "api_cache_ttl": 300,
+    "ocr_enabled": false
+  },
+  "plugins": {
+    "timer": {
+      "enabled": true,
+      "position": [20, 20]
+    },
+    "build_info": {
+      "enabled": true,
+      "position": [20, 120]
+    },
+    "nemesis": {
+      "enabled": true,
+      "position": [20, 300]
+    },
+    "rift_info": {
+      "enabled": true,
+      "position": [20, 400]
+    }
+  },
+  "performance": {
+    "target_fps": 30,
+    "render_quality": "medium",
+    "cache_size_mb": 50,
+    "log_poll_interval": 1.0
+  },
+  "ui": {
+    "font_name": "Microsoft YaHei",
+    "bg_color": [0, 0, 0, 160],
+    "text_color": [255, 255, 255, 255],
+    "accent_color": [255, 165, 0, 255],
+    "border_radius": 4,
+    "padding": 8
+  }
+}

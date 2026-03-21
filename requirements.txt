@@ -1,0 +1,14 @@
+# D3OA — Python 依赖
+
+# 核心依赖
+pygame>=2.5.0          # UI 渲染引擎
+requests>=2.31.0       # Blizzard API 调用
+pywin32>=306           # Win32 API 绑定（可选，ctypes 替代方案可用）
+
+# 可选依赖
+psutil>=5.9.0          # 进程检测增强
+pytesseract>=0.3.10    # OCR 功能（可选）
+Pillow>=10.0.0         # 图像处理（截图/OCR）
+
+# 开发依赖
+pyinstaller>=6.0.0     # 打包为 EXE
