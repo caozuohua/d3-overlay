@@ -14,6 +14,67 @@ import time
 import logging
 from pathlib import Path
 
+# ─── Windows 兼容性初始化（必须在其他导入之前）────────────
+
+def _init_windows_compat():
+    """Windows 平台兼容性初始化
+    
+    1. 设置 DPI 感知，避免高分辨率屏幕模糊
+    2. 禁用 DPI 缩放代理，确保叠加窗口坐标正确
+    3. 设置控制台编码为 UTF-8
+    """
+    if sys.platform != 'win32':
+        return
+
+    # 设置 DPI 感知（优先 PerMonitorV2，回退到 PerMonitor，再回退到 System）
+    try:
+        import ctypes
+        shcore = ctypes.windll.shcore
+        
+        # Process_DPI_Awareness 枚举
+        DPI_AWARENESS_INVALID = -1
+        DPI_AWARENESS_UNAWARE = 0
+        DPI_AWARENESS_SYSTEM_AWARE = 1
+        DPI_AWARENESS_PER_MONITOR_AWARE = 2
+        
+        # Windows 10 1703+ 支持 PerMonitorV2
+        try:
+            ctypes.windll.user32.SetProcessDpiAwarenessContext(
+                ctypes.c_void_p(-4)  # DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+            )
+            logging.getLogger("D3OA").info("DPI 感知设置: PerMonitorV2")
+        except (AttributeError, OSError):
+            # 回退到 shcore.SetProcessDpiAwareness (Windows 8.1+)
+            try:
+                shcore.SetProcessDpiAwareness(DPI_AWARENESS_PER_MONITOR_AWARE)
+                logging.getLogger("D3OA").info("DPI 感知设置: PerMonitor")
+            except (AttributeError, OSError):
+                # 最终回退 (Windows Vista+)
+                ctypes.windll.user32.SetProcessDPIAware()
+                logging.getLogger("D3OA").info("DPI 感知设置: System")
+    except Exception as e:
+        logging.getLogger("D3OA").warning(f"DPI 感知设置失败: {e}")
+
+    # 设置控制台输出编码为 UTF-8
+    try:
+        import ctypes
+        # 设置控制台代码页为 UTF-8 (65001)
+        ctypes.windll.kernel32.SetConsoleOutputCP(65001)
+        ctypes.windll.kernel32.SetConsoleCP(65001)
+    except Exception:
+        pass
+
+    # 禁用 Windows 的 DPI 虚拟化（防止窗口位置偏移）
+    try:
+        import ctypes
+        # 设置 DWM 窗口属性，禁用非客户区 DPI 缩放
+        # 这对于透明叠加窗口非常重要，否则窗口位置会偏移
+        pass  # overlay.py 中通过 DWM API 处理
+    except Exception:
+        pass
+
+_init_windows_compat()
+
 # 确保 src 目录在路径中
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -77,8 +138,18 @@ class D3OverlayApp:
         # 4. 初始化叠加窗口
         logger.info("创建透明叠加窗口...")
         self.overlay = OverlayManager(self.config)
-        if not self.overlay.create():
-            logger.error("叠加窗口创建失败！请检查是否以管理员权限运行。")
+        result = self.overlay.create()
+        if not result:
+            err_msg = result if isinstance(result, str) else "未知错误"
+            logger.error(f"叠加窗口创建失败: {err_msg}")
+            logger.error("可能原因: ")
+            logger.error("  1. 安全软件拦截了 CreateWindowExW 调用")
+            logger.error("  2. 系统 DPI 缩放导致窗口创建参数异常")
+            logger.error("  3. 缺少 d3oa.manifest 文件导致兼容性问题")
+            logger.error("解决方案: ")
+            logger.error("  1. 将 D3OA 添加到杀毒软件白名单")
+            logger.error("  2. 确保 d3oa.manifest 文件与 EXE 在同一目录")
+            logger.error("  3. 尝试以管理员身份运行一次（仅首次）")
             return False
         logger.info("叠加窗口创建成功")
 

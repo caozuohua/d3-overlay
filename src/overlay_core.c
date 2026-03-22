@@ -1,19 +1,30 @@
-"""
-D3OA — C 扩展模块: overlay_core.c
-
-高性能 Win32 透明窗口核心功能。
-提供比纯 Python ctypes 更低开销的窗口操作和像素处理。
-
-编译: python setup.py build_ext --inplace
-"""
+/*
+ * D3OA — C 扩展模块: overlay_core.c
+ *
+ * 高性能 Win32 透明窗口核心功能。
+ * 提供比纯 Python ctypes 更低开销的窗口操作和像素处理。
+ *
+ * 安全说明：
+ * - 所有 API 均为标准 Win32 窗口管理接口
+ * - 不读写游戏内存，不注入 DLL，不 Hook API
+ * - 与 OBS、Discord Overlay 原理相同
+ *
+ * 编译: python setup.py build_ext --inplace
+ */
 
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <windows.h>
+#include <dwmapi.h>
 
 /* ─── 常量 ─────────────────────────────────────────────── */
 
 #define OVERLAY_WS_EX (WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)
+
+/* DPI 感知上下文常量 (Windows 10 1703+) */
+#ifndef DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+#define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((HANDLE)-4)
+#endif
 
 /* ─── 全局状态 ─────────────────────────────────────────── */
 
@@ -24,6 +35,50 @@ static void *g_pixels = NULL;
 static int g_width = 0;
 static int g_height = 0;
 static int g_visible = 0;
+
+/* ─── DPI 感知初始化 ─────────────────────────────────── */
+
+static void init_dpi_awareness(void) {
+    /* 
+     * 尝试设置 PerMonitorV2 DPI 感知 (Windows 10 1703+)
+     * 这确保叠加窗口在多显示器、不同 DPI 环境下正确定位
+     */
+    typedef BOOL (WINAPI *SetProcessDpiAwarenessContextFunc)(HANDLE);
+    HMODULE hUser32 = GetModuleHandleW(L"user32.dll");
+    
+    if (hUser32) {
+        SetProcessDpiAwarenessContextFunc pSetCtx = 
+            (SetProcessDpiAwarenessContextFunc)GetProcAddress(hUser32, "SetProcessDpiAwarenessContext");
+        if (pSetCtx) {
+            if (pSetCtx(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)) {
+                return; /* 成功 */
+            }
+        }
+    }
+
+    /* 回退: shcore.SetProcessDpiAwareness (Windows 8.1+) */
+    typedef enum {
+        PROCESS_DPI_UNAWARE = 0,
+        PROCESS_SYSTEM_DPI_AWARE = 1,
+        PROCESS_PER_MONITOR_DPI_AWARE = 2
+    } PROCESS_DPI_AWARENESS;
+
+    typedef HRESULT (WINAPI *SetProcessDpiAwarenessFunc)(PROCESS_DPI_AWARENESS);
+    HMODULE hShcore = LoadLibraryW(L"shcore.dll");
+    
+    if (hShcore) {
+        SetProcessDpiAwarenessFunc pSetAwareness = 
+            (SetProcessDpiAwarenessFunc)GetProcAddress(hShcore, "SetProcessDpiAwareness");
+        if (pSetAwareness) {
+            pSetAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
+        }
+        FreeLibrary(hShcore);
+        return;
+    }
+
+    /* 最终回退: SetProcessDPIAware (Windows Vista+) */
+    SetProcessDPIAware();
+}
 
 /* ─── 窗口过程 ─────────────────────────────────────────── */
 
@@ -38,19 +93,28 @@ static PyObject* py_create_overlay(PyObject* self, PyObject* args) {
     if (!PyArg_ParseTuple(args, "ii", &screen_w, &screen_h))
         return NULL;
 
+    /* 初始化 DPI 感知（仅首次调用生效） */
+    init_dpi_awareness();
+
     HINSTANCE hinst = GetModuleHandle(NULL);
+
+    /* 使用唯一类名，避免冲突 */
+    static wchar_t class_name[64];
+    wsprintfW(class_name, L"D3OA_Core_%08X", GetCurrentProcessId());
 
     /* 注册窗口类 */
     WNDCLASSEXW wc = {0};
     wc.cbSize = sizeof(wc);
     wc.lpfnWndProc = overlay_wndproc;
     wc.hInstance = hinst;
-    wc.lpszClassName = L"D3OA_Core_Overlay";
+    wc.lpszClassName = class_name;
 
     if (!RegisterClassExW(&wc)) {
-        /* 已注册则忽略 */
-        if (GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
-            PyErr_SetString(PyExc_RuntimeError, "RegisterClassExW failed");
+        DWORD err = GetLastError();
+        if (err != ERROR_CLASS_ALREADY_EXISTS) {
+            PyErr_Format(PyExc_RuntimeError, 
+                "RegisterClassExW failed, GetLastError=%lu. "
+                "This may indicate a security software conflict.", err);
             return NULL;
         }
     }
@@ -58,7 +122,7 @@ static PyObject* py_create_overlay(PyObject* self, PyObject* args) {
     /* 创建窗口 */
     HWND hwnd = CreateWindowExW(
         OVERLAY_WS_EX,
-        L"D3OA_Core_Overlay",
+        class_name,
         L"D3OA Core",
         WS_POPUP,
         0, 0, screen_w, screen_h,
@@ -66,7 +130,21 @@ static PyObject* py_create_overlay(PyObject* self, PyObject* args) {
     );
 
     if (!hwnd) {
-        PyErr_SetString(PyExc_RuntimeError, "CreateWindowExW failed");
+        DWORD err = GetLastError();
+        const char *err_desc = "Unknown error";
+        switch (err) {
+            case 0:   err_desc = "Possibly blocked by security software"; break;
+            case 5:   err_desc = "Access denied (check UAC/security software)"; break;
+            case 8:   err_desc = "Insufficient memory"; break;
+            case 87:  err_desc = "Invalid parameters (DPI scaling issue?)"; break;
+            case 1407: err_desc = "Window class not found"; break;
+            case 1410: err_desc = "Window class already exists"; break;
+        }
+        PyErr_Format(PyExc_RuntimeError,
+            "CreateWindowExW failed: %s (error %lu). "
+            "Try: 1) Add D3OA to antivirus whitelist, "
+            "2) Ensure d3oa.manifest is alongside the EXE, "
+            "3) Close other overlay tools.", err_desc, err);
         return NULL;
     }
 

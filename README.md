@@ -213,6 +213,34 @@ python src/main.py
 
 ---
 
+## 🖥️ Windows 兼容性
+
+D3OA 已针对 Windows 10/11 进行优化，包含以下兼容性保障：
+
+### UAC 清单文件 (Manifest)
+
+项目根目录的 `d3oa.manifest` 文件声明了：
+
+| 声明项 | 说明 |
+|--------|------|
+| `requestedExecutionLevel: asInvoker` | 不请求管理员权限，普通用户即可运行 |
+| `dpiAwareness: PerMonitorV2` | 支持高分辨率显示器，避免界面模糊 |
+| `supportedOS` | 声明 Windows 7/8/10/11 兼容性 |
+| `longPathAware: true` | 支持长文件路径 |
+
+### 常见问题快速解决
+
+| 问题 | 原因 | 解决方案 |
+|------|------|----------|
+| 叠加窗口创建失败 | 安全软件拦截 | 将 D3OA 添加到白名单 |
+| 高分屏模糊 | DPI 缩放未感知 | 确保 d3oa.manifest 存在 |
+| 热键不响应 | 与其他程序冲突 | 修改 config.json 中热键配置 |
+| API 数据获取失败 | 防火墙/网络限制 | 放行到 `*.api.blizzard.com` 的 HTTPS |
+
+> 详细故障排除请参阅 [用户手册](docs/USER_GUIDE.md#7-故障排除)。
+
+---
+
 ## 🔌 开发插件
 
 创建自定义插件只需 3 步：

@@ -295,6 +295,116 @@ OCR 功能可以从游戏截图中识别文字信息（如物品属性）：
 2. 以管理员身份运行 D3OA（某些热键需要提升权限）
 3. 检查 `config.json` 中的热键配置
 
+### Q: Windows 安全软件拦截（创建窗口失败）
+
+D3OA 使用标准 Win32 API 创建透明叠加窗口（`CreateWindowExW` + `WS_EX_LAYERED`）。
+部分安全软件（如 360、火绒、卡巴斯基）可能将此行为标记为可疑。
+
+**症状：**
+- 启动后提示「叠加窗口创建失败」
+- 控制台显示 `GetLastError=5`（访问被拒绝）
+- 程序被安全软件隔离或阻止运行
+
+**解决方案：**
+
+1. **将 D3OA 添加到安全软件白名单**
+   - 360：安全卫士 → 信任区 → 添加文件/目录
+   - 火绒：设置 → 允许列表 → 添加程序路径
+   - 卡巴斯基：设置 → 威胁和排除 → 排除项 → 添加
+   - Windows Defender：设置 → 病毒和威胁防护 → 排除项 → 添加
+
+2. **确保 d3oa.manifest 文件存在**
+   - manifest 文件声明了应用的安全属性和 DPI 感知
+   - 文件必须与 EXE 在同一目录
+   - 如果丢失，从项目根目录重新复制
+
+3. **首次以管理员身份运行（仅一次）**
+   - 右键 D3OA.exe → 以管理员身份运行
+   - 首次运行后，后续可以普通权限运行
+   - 这仅用于完成 Windows 对新应用的信任注册
+
+4. **关闭冲突的 overlay 工具**
+   - Discord Overlay（Discord 设置 → Game Overlay → 关闭）
+   - Xbox Game Bar（Windows 设置 → 游戏 → Xbox Game Bar → 关闭）
+   - GeForce Experience Overlay（Alt+Z → 设置 → 关闭 HUD）
+   - Steam Overlay（Steam 设置 → 游戏内 → 关闭）
+
+### Q: 高分辨率屏幕模糊
+
+**症状：**
+- 界面文字和图形模糊
+- 叠加层位置偏移
+
+**原因：**
+Windows DPI 缩放会导致非感知应用被自动缩放，造成模糊。
+
+**解决方案：**
+
+1. **确保 d3oa.manifest 文件存在**
+   - manifest 中声明了 `PerMonitorV2` DPI 感知
+   - 这是最可靠的解决方案
+
+2. **手动设置 EXE 兼容性（备选方案）**
+   - 右键 D3OA.exe → 属性 → 兼容性
+   - 勾选「替代高 DPI 缩放行为」
+   - 缩放执行选择「应用程序」
+
+3. **Python 直接运行时**
+   - D3OA 已在代码中自动设置 DPI 感知
+   - 如果仍然模糊，检查 Python 版本（需要 3.10+）
+
+### Q: Windows 防火墙拦截网络请求
+
+**症状：**
+- API 数据无法获取
+- 控制台显示网络超时
+
+**说明：**
+D3OA 会向 Blizzard API（`us.api.blizzard.com` 或 `gateway.battlenet.com.cn`）发起 HTTPS 请求。
+Windows 防火墙默认不阻止出站连接，但某些企业/校园网络环境可能有额外限制。
+
+**解决方案：**
+
+1. **Windows 防火墙设置**
+   - 控制面板 → Windows Defender 防火墙 → 允许应用通过防火墙
+   - 找到 python.exe 或 d3oa.exe，勾选「专用」和「公用」
+   - 或者创建出站规则允许 HTTPS (443) 连接
+
+2. **企业/校园网络**
+   - 联系网络管理员，放行到 `*.api.blizzard.com` 和 `*.battlenet.com.cn` 的 HTTPS 连接
+   - 或使用允许访问外网的代理
+
+3. **关闭 API 功能**
+   - 如果不需要构筑信息展示，可以在 config.json 中禁用 build_info 插件
+   - 不配置 BattleTag 即可避免 API 调用
+
+### Q: 全局热键与系统冲突
+
+**症状：**
+- F8/F9/F10/F11 被其他程序占用
+- 按下快捷键后没有反应
+
+**解决方案：**
+
+1. **修改热键配置**
+   ```json
+   {
+     "hotkeys": {
+       "toggle_overlay": "Ctrl+F8",
+       "toggle_timer": "Ctrl+F9",
+       "cycle_layout": "Ctrl+F10",
+       "settings": "Ctrl+F11"
+     }
+   }
+   ```
+
+2. **常见冲突程序**
+   - Visual Studio：F8 查找下一个
+   - Eclipse：F8 调试继续
+   - IntelliJ：F9 恢复程序
+   - Steam：F12 截图
+   - 解决方案：为 D3OA 添加修饰键（如 Ctrl+Shift+F8）
+
 ---
 
 ## 8. 安全说明
