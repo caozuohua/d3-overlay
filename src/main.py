@@ -84,6 +84,7 @@ from game_monitor import GameMonitor
 from data_provider import DataProvider
 from plugin_manager import PluginManager
 from hotkey import HotkeyManager
+from click_simulator import ClickSimulator
 
 # ─── 日志配置 ───────────────────────────────────────────
 
@@ -112,6 +113,7 @@ class D3OverlayApp:
         self.data_provider = None
         self.plugin_manager = None
         self.hotkey_manager = None
+        self.click_simulator = None
 
     def initialize(self):
         """初始化所有组件"""
@@ -170,6 +172,12 @@ class D3OverlayApp:
         self.hotkey_manager = HotkeyManager(self.config)
         self._register_hotkeys()
 
+        # 7. 初始化自动点击器
+        if self.config.get('autoclicker.enabled', True):
+            logger.info("初始化自动点击器...")
+            self.click_simulator = ClickSimulator(self.config, self.game_monitor)
+            logger.info("自动点击器就绪 (F7 切换)")
+
         logger.info("D3OA 初始化完成！")
         return True
 
@@ -191,6 +199,12 @@ class D3OverlayApp:
             self.config.get('hotkeys.settings', 'F11'),
             self._on_settings
         )
+        # 自动点击切换
+        if self.click_simulator:
+            self.hotkey_manager.register(
+                self.config.get('hotkeys.toggle_autoclick', 'F7'),
+                self._on_toggle_autoclick
+            )
         # 老板键
         self.hotkey_manager.register(
             'Ctrl+Shift+H',
@@ -236,6 +250,10 @@ class D3OverlayApp:
                 self.plugin_manager.render_all(self.overlay.get_surface())
                 self.overlay.end_frame()
 
+                # 更新自动点击器
+                if self.click_simulator:
+                    self.click_simulator.update()
+
                 # 处理热键
                 self.hotkey_manager.poll()
 
@@ -271,6 +289,13 @@ class D3OverlayApp:
         if timer:
             timer.toggle()
 
+    def _on_toggle_autoclick(self):
+        """切换自动点击"""
+        if self.click_simulator:
+            self.click_simulator.toggle()
+            state = "开启" if self.click_simulator.is_active() else "关闭"
+            logger.info(f"热键: 自动点击{state}")
+
     def _on_cycle_layout(self):
         """切换布局"""
         logger.info("热键: 切换布局")
@@ -291,6 +316,9 @@ class D3OverlayApp:
         """关闭应用"""
         logger.info("D3OA 正在关闭...")
         self.running = False
+
+        if self.click_simulator:
+            self.click_simulator.stop()
 
         if self.hotkey_manager:
             self.hotkey_manager.unregister_all()

@@ -340,7 +340,11 @@ class OverlayManager:
             self.show()
 
     def sync_to_game_window(self):
-        """将叠加窗口同步到游戏窗口位置"""
+        """将叠加窗口同步到游戏窗口位置
+        
+        支持多显示器环境：直接使用游戏窗口的尺寸而非屏幕尺寸。
+        游戏窗口在副屏上也能正确定位叠加层。
+        """
         game_hwnd = user32.FindWindowW("D3 Main Window Class", None)
         if not game_hwnd:
             return False
@@ -349,7 +353,12 @@ class OverlayManager:
         user32.GetWindowRect(game_hwnd, ctypes.byref(rect))
 
         x, y = rect.left, rect.top
-        w, h = rect.right - rect.left, rect.bottom - rect.top
+        w = rect.right - rect.left
+        h = rect.bottom - rect.top
+
+        # 过滤无效尺寸（最小化时 rect 为负值）
+        if w <= 0 or h <= 0:
+            return False
 
         if w != self._width or h != self._height:
             self._width = w
@@ -381,14 +390,15 @@ class OverlayManager:
             user32.SetWindowLongW(self.hwnd, GWL_EXSTYLE, ex_style)
 
     def begin_frame(self):
-        """开始新一帧渲染"""
-        # 清空像素缓冲区（全透明）
+        """开始新一帧渲染
+        
+        使用 ctypes.memset 快速清空像素缓冲区。
+        比 Python for 循环快 ~1000 倍。
+        """
         if self._pixels:
-            for i in range(0, len(self._pixels), 4):
-                self._pixels[i] = 0      # B
-                self._pixels[i+1] = 0    # G
-                self._pixels[i+2] = 0    # R
-                self._pixels[i+3] = 0    # A
+            ctypes.memset(
+                ctypes.addressof(self._pixels), 0, len(self._pixels)
+            )
 
     def end_frame(self):
         """结束帧渲染，推送到叠加窗口"""
