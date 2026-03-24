@@ -139,28 +139,112 @@ class GameLogWatcher:
         logger.info(f"日志监控: {self.log_path}")
 
     def _find_log_path(self) -> Optional[str]:
-        """自动定位 D3 日志文件"""
+        """自动定位 D3 日志文件
+        
+        支持以下路径：
+        - 标准 Documents 文件夹
+        - OneDrive 同步的 Documents 文件夹
+        - 中文系统文档文件夹
+        - 游戏安装目录
+        """
+        # 构建候选路径列表
+        user_profile = os.path.expanduser("~")
+        
         candidates = [
-            os.path.expanduser("~/Documents/Diablo III/Logs/D3Debug.txt"),
-            os.path.expanduser("~/我的文档/Diablo III/Logs/D3Debug.txt"),
+            # 标准 Documents (英文系统)
+            os.path.join(user_profile, "Documents", "Diablo III", "Logs", "D3Debug.txt"),
+            # OneDrive Documents (Windows 10/11 常见)
+            os.path.join(user_profile, "OneDrive", "Documents", "Diablo III", "Logs", "D3Debug.txt"),
+            os.path.join(user_profile, "OneDrive - Personal", "Documents", "Diablo III", "Logs", "D3Debug.txt"),
+            # 中文系统
+            os.path.join(user_profile, "我的文档", "Diablo III", "Logs", "D3Debug.txt"),
+            os.path.join(user_profile, "文档", "Diablo III", "Logs", "D3Debug.txt"),
+            # 游戏安装目录
             "C:/Program Files (x86)/Diablo III/Logs/D3Debug.txt",
+            "C:/Program Files/Diablo III/Logs/D3Debug.txt",
         ]
+
+        # 使用 Win32 API 获取实际 Documents 文件夹路径（最可靠）
+        try:
+            import ctypes
+            from ctypes import wintypes
+            
+            # SHGetKnownFolderPath 获取已知文件夹路径
+            FOLDERID_Documents = "{FDD39AD0-238F-46AF-ADB4-6C85480369C7}"
+            
+            ole32 = ctypes.windll.ole32
+            shell32 = ctypes.windll.shell32
+            
+            class GUID(ctypes.Structure):
+                _fields_ = [
+                    ("Data1", ctypes.c_ulong),
+                    ("Data2", ctypes.c_ushort),
+                    ("Data3", ctypes.c_ushort),
+                    ("Data4", ctypes.c_byte * 8),
+                ]
+            
+            guid = GUID()
+            ole32.CLSIDFromString(FOLDERID_Documents, ctypes.byref(guid))
+            
+            path_ptr = ctypes.c_wchar_p()
+            hr = shell32.SHGetKnownFolderPath(
+                ctypes.byref(guid), 0, None, ctypes.byref(path_ptr)
+            )
+            if hr == 0 and path_ptr.value:
+                docs_path = path_ptr.value
+                d3_log = os.path.join(docs_path, "Diablo III", "Logs", "D3Debug.txt")
+                candidates.insert(0, d3_log)  # 优先检查
+                ole32.CoTaskMemFree(path_ptr)
+        except Exception:
+            pass
+
+        # 检查所有候选路径
         for path in candidates:
-            if os.path.exists(path):
+            if path and os.path.exists(path):
+                logger.info(f"找到 D3 日志文件: {path}")
                 return path
+
+        logger.warning("未找到 D3 日志文件，日志监控功能将不可用")
         return None
 
     def poll_new_lines(self) -> list:
-        """读取新增的日志行"""
+        """读取新增的日志行
+        
+        安全处理：
+        - 文件不存在时不报错
+        - D3 写入时遇到文件锁则跳过本次
+        - 编码错误的字符用 ? 替代
+        """
         if not self.log_path or not os.path.exists(self.log_path):
             return []
 
         try:
-            with open(self.log_path, 'r', encoding='utf-8', errors='ignore') as f:
+            # 检查文件大小是否变化（避免重复读取）
+            try:
+                current_size = os.path.getsize(self.log_path)
+            except OSError:
+                return []
+
+            if current_size < self._last_pos:
+                # 文件被截断/轮转，重置位置
+                logger.info("日志文件已重置，重新开始读取")
+                self._last_pos = 0
+
+            if current_size == self._last_pos:
+                return []  # 没有新内容
+
+            with open(self.log_path, 'r', encoding='utf-8', errors='replace') as f:
                 f.seek(self._last_pos)
                 lines = f.readlines()
                 self._last_pos = f.tell()
             return [l.strip() for l in lines if l.strip()]
+        except PermissionError:
+            # D3 正在写入文件，文件被锁定
+            # 下次轮询时再试
+            return []
+        except OSError as e:
+            logger.warning(f"读取日志文件时出错: {e}")
+            return []
         except Exception as e:
             logger.error(f"读取日志失败: {e}")
             return []

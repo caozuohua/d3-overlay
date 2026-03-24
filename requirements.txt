@@ -3,12 +3,17 @@
 # 核心依赖
 pygame>=2.5.0          # UI 渲染引擎
 requests>=2.31.0       # Blizzard API 调用
-pywin32>=306           # Win32 API 绑定（可选，ctypes 替代方案可用）
+
+# 进程检测
+psutil>=5.9.0          # 进程检测（可选，不可用时自动使用 Win32 原生 API）
 
 # 可选依赖
-psutil>=5.9.0          # 进程检测增强
 pytesseract>=0.3.10    # OCR 功能（可选）
-Pillow>=10.0.0         # 图像处理（截图/OCR）
+Pillow>=10.0.0         # 图像处理（截图/OCR，可选）
 
 # 开发依赖
-pyinstaller>=6.0.0     # 打包为 EXE
+pyinstaller>=6.0.0     # 打包为 EXE（开发用）
+
+# 注意：pywin32 不需要安装
+# D3OA 使用 ctypes 直接调用 Win32 API，无需 pywin32 依赖
+# 这减少了安装复杂度，避免了 pywin32 版本兼容问题

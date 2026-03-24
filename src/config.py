@@ -6,9 +6,10 @@ D3OA — 配置管理器
 
 import json
 import os
+import sys
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 logger = logging.getLogger("D3OA.Config")
 
@@ -25,7 +26,8 @@ DEFAULT_CONFIG = {
         "toggle_overlay": "F8",
         "toggle_timer": "F9",
         "cycle_layout": "F10",
-        "settings": "F11"
+        "settings": "F11",
+        "toggle_autoclick": "F7"
     },
     "data": {
         "battle_tag": "",
@@ -40,6 +42,15 @@ DEFAULT_CONFIG = {
         "build_info": {"enabled": True, "position": [20, 120]},
         "nemesis": {"enabled": True, "position": [20, 300]},
         "rift_info": {"enabled": True, "position": [20, 400]}
+    },
+    "autoclicker": {
+        "enabled": True,
+        "interval_ms": 100,
+        "max_clicks": 0,
+        "foreground_only": True,
+        "click_button": "left",
+        "pause_on_key": True,
+        "pause_key": "SHIFT"
     },
     "performance": {
         "target_fps": 30,
@@ -72,29 +83,84 @@ class Config:
         return str(config_dir / "config.json")
 
     def load(self):
-        """加载配置文件"""
+        """加载配置文件
+        
+        安全处理：
+        - 主配置损坏时自动尝试加载 .bak 备份
+        - 加载失败时使用默认配置
+        """
         # 先加载默认值
         self._data = self._deep_copy(DEFAULT_CONFIG)
 
         # 尝试加载用户配置
         if os.path.exists(self._config_path):
-            try:
-                with open(self._config_path, 'r', encoding='utf-8') as f:
-                    user_config = json.load(f)
-                self._deep_merge(self._data, user_config)
+            loaded = self._try_load_file(self._config_path)
+            if loaded is not None:
+                self._deep_merge(self._data, loaded)
                 logger.info(f"配置已加载: {self._config_path}")
-            except Exception as e:
-                logger.error(f"配置加载失败: {e}，使用默认配置")
+            else:
+                # 主配置损坏，尝试加载备份
+                backup_path = self._config_path + '.bak'
+                if os.path.exists(backup_path):
+                    logger.warning(f"主配置损坏，尝试从备份恢复: {backup_path}")
+                    backup_data = self._try_load_file(backup_path)
+                    if backup_data is not None:
+                        self._deep_merge(self._data, backup_data)
+                        self.save()  # 恢复后重新保存
+                        logger.info("已从备份恢复配置")
+                    else:
+                        logger.error("备份也已损坏，使用默认配置")
+                else:
+                    logger.error("配置文件损坏且无备份，使用默认配置")
         else:
             # 创建默认配置文件
             self.save()
             logger.info(f"已创建默认配置: {self._config_path}")
 
-    def save(self):
-        """保存配置到文件"""
+    def _try_load_file(self, path: str) -> Optional[dict]:
+        """尝试加载 JSON 配置文件，失败返回 None"""
         try:
-            with open(self._config_path, 'w', encoding='utf-8') as f:
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON 解析错误 ({path}): {e}")
+            return None
+        except Exception as e:
+            logger.error(f"配置加载失败 ({path}): {e}")
+            return None
+
+    def save(self):
+        """保存配置到文件
+        
+        安全处理：
+        - 保存前备份旧配置为 .bak
+        - 使用原子写入（先写临时文件再重命名）
+        """
+        try:
+            # 备份旧配置
+            if os.path.exists(self._config_path):
+                backup_path = self._config_path + '.bak'
+                try:
+                    import shutil
+                    shutil.copy2(self._config_path, backup_path)
+                except Exception:
+                    pass  # 备份失败不影响主流程
+
+            # 原子写入: 先写临时文件，再重命名
+            tmp_path = self._config_path + '.tmp'
+            with open(tmp_path, 'w', encoding='utf-8') as f:
                 json.dump(self._data, f, indent=2, ensure_ascii=False)
+                f.flush()
+                import os as _os
+                _os.fsync(f.fileno())  # 确保写入磁盘
+
+            # 重命名替换旧文件
+            if sys.platform == 'win32':
+                # Windows 不允许直接覆盖已存在的文件
+                if os.path.exists(self._config_path):
+                    os.remove(self._config_path)
+            os.rename(tmp_path, self._config_path)
+
             logger.info(f"配置已保存: {self._config_path}")
         except Exception as e:
             logger.error(f"配置保存失败: {e}")

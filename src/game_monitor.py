@@ -14,6 +14,71 @@ import time
 logger = logging.getLogger("D3OA.GameMonitor")
 
 user32 = ctypes.windll.user32
+kernel32 = ctypes.windll.kernel32
+
+# ─── Win32 API 类型声明 ─────────────────────────────────
+
+# EnumWindows / EnumWindowsProc
+EnumWindowsProc = ctypes.WINFUNCTYPE(
+    ctypes.wintypes.BOOL,
+    ctypes.wintypes.HWND,
+    ctypes.wintypes.LPARAM
+)
+
+user32.EnumWindows.argtypes = [EnumWindowsProc, ctypes.wintypes.LPARAM]
+user32.EnumWindows.restype = ctypes.wintypes.BOOL
+
+user32.GetWindowThreadProcessId.argtypes = [
+    ctypes.wintypes.HWND,
+    ctypes.POINTER(ctypes.c_ulong)
+]
+user32.GetWindowThreadProcessId.restype = ctypes.c_ulong
+
+user32.IsWindowVisible.argtypes = [ctypes.wintypes.HWND]
+user32.IsWindowVisible.restype = ctypes.wintypes.BOOL
+
+user32.IsIconic.argtypes = [ctypes.wintypes.HWND]
+user32.IsIconic.restype = ctypes.wintypes.BOOL
+
+user32.GetForegroundWindow.restype = ctypes.wintypes.HWND
+
+user32.FindWindowW.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p]
+user32.FindWindowW.restype = ctypes.wintypes.HWND
+
+user32.GetWindowRect.argtypes = [ctypes.wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+user32.GetWindowRect.restype = ctypes.wintypes.BOOL
+
+# ─── Toolhelp32 API (原生进程枚举，不依赖 psutil) ────────
+
+TH32CS_SNAPPROCESS = 0x00000002
+INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+
+class PROCESSENTRY32W(ctypes.Structure):
+    _fields_ = [
+        ("dwSize", ctypes.c_ulong),
+        ("cntUsage", ctypes.c_ulong),
+        ("th32ProcessID", ctypes.c_ulong),
+        ("th32DefaultHeapID", ctypes.POINTER(ctypes.c_ulong)),
+        ("th32ModuleID", ctypes.c_ulong),
+        ("cntThreads", ctypes.c_ulong),
+        ("th32ParentProcessID", ctypes.c_ulong),
+        ("pcPriClassBase", ctypes.c_long),
+        ("dwFlags", ctypes.c_ulong),
+        ("szExeFile", ctypes.c_wchar * 260),
+    ]
+
+try:
+    kernel32.CreateToolhelp32Snapshot.argtypes = [ctypes.c_ulong, ctypes.c_ulong]
+    kernel32.CreateToolhelp32Snapshot.restype = ctypes.wintypes.HANDLE
+    kernel32.Process32FirstW.argtypes = [ctypes.wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32W)]
+    kernel32.Process32FirstW.restype = ctypes.wintypes.BOOL
+    kernel32.Process32NextW.argtypes = [ctypes.wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32W)]
+    kernel32.Process32NextW.restype = ctypes.wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [ctypes.wintypes.HANDLE]
+    kernel32.CloseHandle.restype = ctypes.wintypes.BOOL
+    TOOLHELP_AVAILABLE = True
+except AttributeError:
+    TOOLHELP_AVAILABLE = False
 
 # D3 窗口类名 — 通过 Spy++ 工具获取
 D3_WINDOW_CLASS = "D3 Main Window Class"
@@ -85,64 +150,102 @@ class GameMonitor:
 
     def _find_game_window(self):
         """查找游戏窗口"""
+        # 方法 1: 通过窗口类名查找（最快，不需要进程枚举）
         hwnd = user32.FindWindowW(D3_WINDOW_CLASS, None)
         if hwnd:
             return hwnd
 
-        # 备用：通过进程名查找
+        # 方法 2: 通过进程名查找窗口（需要进程枚举）
+        pids = self._find_game_pids()
+        if not pids:
+            return None
+
+        # 枚举所有可见窗口，找到属于游戏进程的窗口
+        found_hwnd = [None]
+
+        def enum_cb(hwnd, lParam):
+            if found_hwnd[0] is not None:
+                return False  # 已找到，停止枚举
+            if not user32.IsWindowVisible(hwnd):
+                return True
+            dw_pid = ctypes.c_ulong()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(dw_pid))
+            if dw_pid.value in pids:
+                found_hwnd[0] = hwnd
+                return False
+            return True
+
+        callback = EnumWindowsProc(enum_cb)
+        user32.EnumWindows(callback, 0)
+        return found_hwnd[0]
+
+    def _find_game_pids(self) -> set:
+        """查找游戏进程 PID 集合"""
+        pids = set()
+
+        # 优先使用 psutil（如果可用）
         try:
             import psutil
             for proc in psutil.process_iter(['pid', 'name']):
                 if proc.info['name'] in D3_PROCESS_NAMES:
-                    # 尝试枚举该进程的窗口
-                    pid = proc.info['pid']
-                    EnumWindowsProc = ctypes.WINFUNCTYPE(
-                        ctypes.wintypes.BOOL,
-                        ctypes.wintypes.HWND,
-                        ctypes.wintypes.LPARAM
-                    )
-
-                    found_hwnd = [None]
-
-                    def enum_cb(hwnd, lParam):
-                        dw_pid = ctypes.c_ulong()
-                        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(dw_pid))
-                        if dw_pid.value == pid:
-                            # 检查是否可见
-                            if user32.IsWindowVisible(hwnd):
-                                found_hwnd[0] = hwnd
-                                return False
-                        return True
-
-                    user32.EnumWindows(EnumWindowsProc(enum_cb), 0)
-                    if found_hwnd[0]:
-                        return found_hwnd[0]
+                    pids.add(proc.info['pid'])
+            if pids:
+                return pids
         except ImportError:
             pass
 
-        return None
+        # 回退: 使用 Win32 Toolhelp32 API（原生，不需要 psutil）
+        if TOOLHELP_AVAILABLE:
+            pids = self._find_pids_native()
+        
+        return pids
+
+    def _find_pids_native(self) -> set:
+        """使用 Win32 Toolhelp32 API 查找进程 PID（不依赖 psutil）"""
+        pids = set()
+        pe = PROCESSENTRY32W()
+        pe.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+
+        snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if snapshot == INVALID_HANDLE_VALUE:
+            return pids
+
+        try:
+            if kernel32.Process32FirstW(snapshot, ctypes.byref(pe)):
+                while True:
+                    if pe.szExeFile in D3_PROCESS_NAMES:
+                        pids.add(pe.th32ProcessID)
+                    if not kernel32.Process32NextW(snapshot, ctypes.byref(pe)):
+                        break
+        finally:
+            kernel32.CloseHandle(snapshot)
+
+        return pids
 
     def _monitor_loop(self):
         """后台监控循环"""
         was_running = False
 
         while self._running:
-            running = self.is_game_running()
+            try:
+                running = self.is_game_running()
 
-            if running != was_running:
-                if running:
-                    logger.info("游戏窗口检测到")
-                else:
-                    logger.info("游戏窗口已关闭")
+                if running != was_running:
+                    if running:
+                        logger.info("游戏窗口检测到")
+                    else:
+                        logger.info("游戏窗口已关闭")
 
-                with self._lock:
-                    for cb in self._callbacks:
-                        try:
-                            cb(running)
-                        except Exception as e:
-                            logger.error(f"回调执行失败: {e}")
+                    with self._lock:
+                        for cb in self._callbacks:
+                            try:
+                                cb(running)
+                            except Exception as e:
+                                logger.error(f"回调执行失败: {e}")
 
-                was_running = running
+                    was_running = running
+            except Exception as e:
+                logger.error(f"游戏监控异常: {e}")
 
             time.sleep(2)  # 每 2 秒检测一次
 

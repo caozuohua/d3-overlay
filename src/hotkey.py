@@ -3,13 +3,17 @@ D3OA — 全局热键管理器
 
 使用 Win32 RegisterHotKey API 注册系统级热键。
 不需要注入或 Hook，标准 Windows API 调用。
+
+热键处理方式：
+- 仅通过主线程的 poll() 方法处理热键消息
+- 使用 PeekMessageW 非阻塞轮询
+- MOD_NOREPEAT 防止单次按键触发多次
+- 不启动后台线程，避免重复处理
 """
 
 import ctypes
 import ctypes.wintypes as wintypes
 import logging
-import threading
-import time
 
 logger = logging.getLogger("D3OA.Hotkey")
 
@@ -76,14 +80,15 @@ def parse_hotkey(hotkey_str: str) -> tuple:
 
 
 class HotkeyManager:
-    """全局热键管理器"""
+    """全局热键管理器
+
+    仅使用主线程 poll() 处理热键，避免后台线程竞争导致重复触发。
+    """
 
     def __init__(self, config):
         self.config = config
         self._hotkeys = {}  # id -> (hotkey_str, callback)
         self._next_id = 1
-        self._running = False
-        self._thread = None
 
     def register(self, hotkey_str: str, callback) -> int:
         """注册全局热键"""
@@ -95,18 +100,16 @@ class HotkeyManager:
         hotkey_id = self._next_id
         self._next_id += 1
 
-        # 添加 NOREPEAT 防止重复触发
+        # 添加 NOREPEAT 防止单次按键触发多次
         mod = modifiers | MOD_NOREPEAT
 
         if user32.RegisterHotKey(None, hotkey_id, mod, vk):
             self._hotkeys[hotkey_id] = (hotkey_str, callback)
             logger.info(f"热键已注册: {hotkey_str} (id={hotkey_id})")
-
-            # 启动消息循环（如果还没启动）
-            if not self._running:
-                self._start_message_loop()
         else:
-            logger.error(f"热键注册失败: {hotkey_str} (可能被其他程序占用)")
+            import ctypes
+            err = ctypes.windll.kernel32.GetLastError()
+            logger.error(f"热键注册失败: {hotkey_str} (GetLastError={err}, 可能被其他程序占用)")
             hotkey_id = -1
 
         return hotkey_id
@@ -121,18 +124,23 @@ class HotkeyManager:
 
     def unregister_all(self):
         """注销所有热键"""
-        self._running = False
         for hotkey_id in list(self._hotkeys.keys()):
             user32.UnregisterHotKey(None, hotkey_id)
         self._hotkeys.clear()
         logger.info("所有热键已注销")
 
     def poll(self):
-        """轮询热键消息（非阻塞，从主线程调用）"""
+        """轮询热键消息（非阻塞，从主线程调用）
+
+        使用 PeekMessageW + PM_REMOVE 提取消息。
+        每次 poll 最多处理 10 条热键消息，防止热键风暴阻塞主线程。
+        """
         msg = wintypes.MSG()
-        while user32.PeekMessageW(
+        count = 0
+        while count < 10 and user32.PeekMessageW(
             ctypes.byref(msg), None, WM_HOTKEY, WM_HOTKEY, 1  # PM_REMOVE
         ):
+            count += 1
             hotkey_id = msg.wParam
             if hotkey_id in self._hotkeys:
                 hotkey_str, callback = self._hotkeys[hotkey_id]
@@ -140,26 +148,3 @@ class HotkeyManager:
                     callback()
                 except Exception as e:
                     logger.error(f"热键回调执行失败 [{hotkey_str}]: {e}")
-
-    def _start_message_loop(self):
-        """启动热键消息循环（后台线程）"""
-        self._running = True
-
-        def message_loop():
-            msg = wintypes.MSG()
-            while self._running:
-                # 使用 GetMessageW 阻塞等待消息
-                result = user32.GetMessageW(ctypes.byref(msg), None, WM_HOTKEY, WM_HOTKEY)
-                if result <= 0:
-                    break
-                hotkey_id = msg.wParam
-                if hotkey_id in self._hotkeys:
-                    hotkey_str, callback = self._hotkeys[hotkey_id]
-                    try:
-                        callback()
-                    except Exception as e:
-                        logger.error(f"热键回调执行失败 [{hotkey_str}]: {e}")
-
-        self._thread = threading.Thread(target=message_loop, daemon=True, name="HotkeyLoop")
-        self._thread.start()
-        logger.info("热键消息循环已启动")
