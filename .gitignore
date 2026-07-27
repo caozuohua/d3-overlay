@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Local artifacts
+_boot_out.txt
+_tmp_*.json
+
+# Editor / tool config
+.trae/
+
+# OS
+Thumbs.db
+Desktop.ini
