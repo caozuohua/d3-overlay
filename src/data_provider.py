@@ -67,11 +67,13 @@ class D3APIClient:
         'cn': 'zh_CN',
     }
 
-    def __init__(self, region='us', access_token=None):
+    def __init__(self, region='us', access_token=None, client_id=None, client_secret=None):
         self.region = region
         self.base_url = self.REGIONS.get(region, self.REGIONS['us'])
         self.locale = self.LOCALE.get(region, 'en_US')
         self.access_token = access_token
+        self.client_id = client_id
+        self.client_secret = client_secret
         self._session = None
 
     def _get_session(self):
@@ -80,10 +82,43 @@ class D3APIClient:
             self._session = requests.Session()
         return self._session
 
+    def _ensure_token(self):
+        """Blizzard D3 API 强制需要 access_token。
+
+        F3 修复：若无手动 token，则通过 OAuth2 client-credentials 流程换取
+        （POST https://{region}.battle.net/oauth/token, grant_type=client_credentials,
+         Basic Auth = client_id:client_secret）。文档曾称“无需认证”，不实。
+        返回 True 表示已有可用 token。
+        """
+        if self.access_token:
+            return True
+        if not self.client_id or not self.client_secret:
+            logger.warning("未配置 access_token 或 client_id/client_secret，无法获取 Blizzard API token")
+            return False
+        try:
+            session = self._get_session()
+            token_url = f"https://{self.region}.battle.net/oauth/token"
+            resp = session.post(
+                token_url,
+                data={"grant_type": "client_credentials"},
+                auth=(self.client_id, self.client_secret),
+                timeout=10,
+            )
+            resp.raise_for_status()
+            self.access_token = resp.json().get("access_token")
+            if not self.access_token:
+                logger.error("Blizzard OAuth 返回为空 token")
+                return False
+            logger.info("已通过 client-credentials 获取 Blizzard API token")
+            return True
+        except Exception as e:
+            logger.error(f"获取 Blizzard API token 失败: {e}")
+            return False
+
     def _request(self, endpoint: str, params: dict = None) -> Optional[dict]:
-        """发送 API 请求"""
-        if not self.access_token:
-            logger.warning("未设置 API access_token，跳过 API 请求")
+        """发送 API 请求（自动确保 token）"""
+        if not self._ensure_token():
+            logger.warning("无可用 API access_token，跳过 API 请求")
             return None
 
         url = f"{self.base_url}{endpoint}"
@@ -188,6 +223,10 @@ class GameLogWatcher:
         if 'nephalemrift' in lower or 'greater_rift' in lower:
             return {'type': 'rift_event', 'raw': line, 'timestamp': time.time()}
 
+        # 复仇怪 (Nemesis)
+        if 'nemesis' in lower:
+            return {'type': 'nemesis', 'raw': line, 'timestamp': time.time()}
+
         # 传送点
         if 'waypoint' in lower:
             return {'type': 'waypoint', 'raw': line, 'timestamp': time.time()}
@@ -211,7 +250,10 @@ class DataProvider:
         # API 客户端
         region = config.get('data.region', 'us')
         token = config.get('data.access_token', None)
-        self.api = D3APIClient(region=region, access_token=token)
+        client_id = config.get('data.client_id', None)
+        client_secret = config.get('data.client_secret', None)
+        self.api = D3APIClient(region=region, access_token=token,
+                               client_id=client_id, client_secret=client_secret)
 
         # 日志监控
         log_path = config.get('data.log_path', 'auto')
