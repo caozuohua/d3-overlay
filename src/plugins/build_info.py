@@ -6,6 +6,7 @@ D3OA 插件 — 构筑信息展示
 
 import logging
 import time
+from plugin_manager import PluginBase
 
 logger = logging.getLogger("D3OA.Plugin.BuildInfo")
 
@@ -32,7 +33,7 @@ CLASS_NAMES = {
 }
 
 
-class Plugin:
+class Plugin(PluginBase):
     """构筑信息展示插件"""
 
     @property
@@ -94,6 +95,8 @@ class Plugin:
 
         pos = self.config.get('plugins.build_info.position', [20, 120])
         x, y = pos
+        if self.overlay and hasattr(self.overlay, 'place'):
+            x, y = self.overlay.place(x, y)
         panel_w, panel_h = 260, 160
 
         # 背景

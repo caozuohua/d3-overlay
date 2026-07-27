@@ -6,6 +6,7 @@ D3OA 插件 — 秘境进度信息
 
 import logging
 import time
+from plugin_manager import PluginBase
 
 logger = logging.getLogger("D3OA.Plugin.RiftInfo")
 
@@ -76,7 +77,7 @@ class RiftTracker:
         return 0.0
 
 
-class Plugin:
+class Plugin(PluginBase):
     """秘境进度信息插件"""
 
     @property
@@ -141,6 +142,8 @@ class Plugin:
 
         pos = self.config.get('plugins.rift_info.position', [20, 400])
         x, y = pos
+        if self.overlay and hasattr(self.overlay, 'place'):
+            x, y = self.overlay.place(x, y)
         panel_w, panel_h = 220, 110
 
         # 背景

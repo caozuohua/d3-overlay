@@ -8,11 +8,12 @@ D3OA 插件 — 复仇怪追踪器
 
 import logging
 import time
+from plugin_manager import PluginBase
 
 logger = logging.getLogger("D3OA.Plugin.Nemesis")
 
 
-class Plugin:
+class Plugin(PluginBase):
     """复仇怪追踪插件"""
 
     @property
@@ -68,6 +69,8 @@ class Plugin:
 
         pos = self.config.get('plugins.nemesis.position', [20, 300])
         x, y = pos
+        if self.overlay and hasattr(self.overlay, 'place'):
+            x, y = self.overlay.place(x, y)
         panel_w, panel_h = 220, 80
 
         # 背景

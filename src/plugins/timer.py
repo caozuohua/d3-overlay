@@ -8,6 +8,7 @@ import time
 import json
 import os
 import logging
+from plugin_manager import PluginBase
 
 logger = logging.getLogger("D3OA.Plugin.Timer")
 
@@ -117,7 +118,7 @@ class RecordManager:
         return self.records.get('best_time')
 
 
-class Plugin:
+class Plugin(PluginBase):
     """秘境计时器插件"""
 
     @property
@@ -168,6 +169,8 @@ class Plugin:
         # 面板位置
         pos = self.config.get('plugins.timer.position', [20, 20])
         x, y = pos
+        if self.overlay and hasattr(self.overlay, 'place'):
+            x, y = self.overlay.place(x, y)
 
         # 背景
         panel_w, panel_h = 220, 90
