@@ -221,8 +221,11 @@ class D3OverlayApp:
         logger.info("D3OA 正在关闭...")
         self.running = False
 
+        if self.game_monitor:
+            self.game_monitor.stop()  # F6: 终止监控线程
+
         if self.hotkey_manager:
-            self.hotkey_manager.unregister_all()
+            self.hotkey_manager.stop()
 
         if self.plugin_manager:
             for p in self.plugin_manager.plugins.values():

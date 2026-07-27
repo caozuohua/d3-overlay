@@ -98,15 +98,19 @@ class HotkeyManager:
         # 添加 NOREPEAT 防止重复触发
         mod = modifiers | MOD_NOREPEAT
 
-        if user32.RegisterHotKey(None, hotkey_id, mod, vk):
-            self._hotkeys[hotkey_id] = (hotkey_str, callback)
-            logger.info(f"热键已注册: {hotkey_str} (id={hotkey_id})")
+        try:
+            if user32.RegisterHotKey(None, hotkey_id, mod, vk):
+                self._hotkeys[hotkey_id] = (hotkey_str, callback)
+                logger.info(f"热键已注册: {hotkey_str} (id={hotkey_id})")
 
-            # 启动消息循环（如果还没启动）
-            if not self._running:
-                self._start_message_loop()
-        else:
-            logger.error(f"热键注册失败: {hotkey_str} (可能被其他程序占用)")
+                # 启动消息循环（如果还没启动）
+                if not self._running:
+                    self._start_message_loop()
+            else:
+                logger.error(f"热键注册失败: {hotkey_str} (可能被其他程序占用)")
+                hotkey_id = -1
+        except Exception as e:
+            logger.error(f"注册热键时出错: {hotkey_str} - {e}")
             hotkey_id = -1
 
         return hotkey_id
@@ -119,13 +123,29 @@ class HotkeyManager:
             del self._hotkeys[hotkey_id]
             logger.info(f"热键已注销: {hotkey_str}")
 
-    def unregister_all(self):
-        """注销所有热键"""
+    def stop(self):
+        """F6 修复：通知后台消息循环退出并注销所有热键。
+
+        后台线程用 GetMessageW 阻塞，需 PostQuitMessage(0)（WM_QUIT）才能解开；
+        仅置 _running=False 不足以让它返回。
+        """
         self._running = False
         for hotkey_id in list(self._hotkeys.keys()):
-            user32.UnregisterHotKey(None, hotkey_id)
+            try:
+                user32.UnregisterHotKey(None, hotkey_id)
+            except Exception:
+                pass
         self._hotkeys.clear()
-        logger.info("所有热键已注销")
+        # 让阻塞的 GetMessageW 返回
+        try:
+            user32.PostQuitMessage(0)
+        except Exception:
+            pass
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=2)
+        logger.info("热键管理器已停止")
+
+
 
     def poll(self):
         """轮询热键消息（非阻塞，从主线程调用）"""
