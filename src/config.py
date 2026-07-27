@@ -31,6 +31,8 @@ DEFAULT_CONFIG = {
         "battle_tag": "",
         "region": "us",
         "access_token": "",
+        "client_id": "",
+        "client_secret": "",
         "log_path": "auto",
         "api_cache_ttl": 300,
         "ocr_enabled": False

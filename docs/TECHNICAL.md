@@ -140,11 +140,19 @@ def sync_overlay_position(self):
 
 ### 3.1 Blizzard D3 公开 API
 
-暴雪提供免费的 Diablo 3 Web API，无需认证即可查询公开角色信息：
+Blizzard 提供 Diablo 3 Web API，但**强制需要 OAuth2 access_token**：
+通过 client-credentials 流程换取
+（`POST https://{region}.battle.net/oauth/token`，`grant_type=client_credentials`，
+Basic Auth 用 Client ID:Secret）。端点返回 403 时无有效 token。
 
+```text
+获取 token: POST https://{region}.battle.net/oauth/token
+查询接口:   GET  https://{region}.api.blizzard.com/d3/...?access_token=TOKEN
 ```
-API Base: https://{region}.api.blizzard.com/d3/
 
+> 注意：早期文档称"无需认证即可查询公开角色信息"，**不实**。D3OA 已在
+> `D3APIClient._ensure_token()` 中实现自动换取；用户需在 config.json 填入
+> `client_id` / `client_secret`（或从 develop.battle.net 申请），或手动填 `access_token`。
 端点列表:
 GET /profile/{battleTag}/              # 玩家档案（生涯数据）
 GET /profile/{battleTag}/hero/{heroId} # 英雄详细信息

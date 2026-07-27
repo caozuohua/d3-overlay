@@ -19,7 +19,7 @@ D3OA 是一款基于 **透明窗口叠加技术** 的 Diablo 3 游戏辅助工�
 | 🛡️ **零注入安全** | 不读写游戏内存，不注入 DLL，不修改游戏文件 |
 | 👻 **透明叠加** | 使用 `WS_EX_LAYERED` 实现像素级透明窗口 |
 | 🖱️ **点击穿透** | 鼠标操作完全穿透叠加层，不影响游戏操作 |
-| 📊 **合法数据源** | Blizzard 公开 API + 游戏日志文件 + 截图 OCR |
+| 📊 **合法数据源** | Blizzard API (OAuth2 token) + 游戏日志文件 + 截图 OCR |
 | 🔌 **插件架构** | 模块化插件系统，社区可轻松扩展 |
 | 🐍 **Python + C** | Python 逻辑层 + C 性能层，兼顾效率与性能 |
 
@@ -82,7 +82,7 @@ D3OA 是一款基于 **透明窗口叠加技术** 的 Diablo 3 游戏辅助工�
 | 语言 | Python 3.10+ | 主逻辑、UI 渲染、数据处理 |
 | 性能层 | C (CPython 扩展) | Win32 API 调用、截图捕获、像素处理 |
 | 窗口管理 | Win32 API | `SetWindowLong`, `SetLayeredWindowAttributes` |
-| 渲染 | Pygame | 叠加层 UI 渲染 |
+| 渲染 | Pygame | 插件渲染到内部 pygame.Surface，再写回 DIB 像素缓冲 |
 | 数据源 | Blizzard D3 API | 角色信息、排行榜（公开接口） |
 | 配置 | JSON | 用户配置与插件配置 |
 
