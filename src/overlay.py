@@ -153,7 +153,17 @@ class OverlayManager:
                 ]
 
             # 定义窗口过程
+            # Python 3.14 下，DefWindowProcW 默认 argtypes 为 32 位有符号，
+            # 而 WM_* 消息的 wparam/lparam 高位（如指针）会超过 2^31 导致 OverflowError。
+            # 显式将其 argtypes 设为 64 位无符号，避免溢出。
+            user32.DefWindowProcW.argtypes = [
+                ctypes.wintypes.HWND, ctypes.wintypes.UINT,
+                ctypes.c_ulonglong, ctypes.c_ulonglong,
+            ]
+            user32.DefWindowProcW.restype = ctypes.c_ulonglong
+
             def wndproc(hwnd, msg, wparam, lparam):
+                # 回调参数已是无符号 64 位，直接透传
                 return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
             # 注册窗口类
