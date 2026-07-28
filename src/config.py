@@ -22,7 +22,7 @@ DEFAULT_CONFIG = {
         "follow_game_window": True
     },
     "hotkeys": {
-        "toggle_overlay": "F8",
+        "toggle_overlay": "Ctrl+Shift+O",
         "toggle_timer": "F9",
         "cycle_layout": "F10",
         "settings": "F11"

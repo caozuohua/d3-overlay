@@ -31,7 +31,7 @@ def test_config_get_set_defaults():
     cfg = Config(config_path=os.path.join(os.path.dirname(__file__), "_tmp_cfg.json"))
     cfg.load()
     assert cfg.get("overlay.opacity") == 0.85
-    assert cfg.get("hotkeys.toggle_overlay") == "F8"
+    assert cfg.get("hotkeys.toggle_overlay") == "Ctrl+Shift+O"
     assert cfg.get("data.region") == "us"
     # 深层 set
     cfg.set("data.battle_tag", "Foo#1234")

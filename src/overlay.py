@@ -6,8 +6,84 @@ D3OA — 透明叠加窗口管理器
 """
 
 import logging
+import ctypes
+import ctypes.wintypes as wintypes
 
 logger = logging.getLogger("D3OA.Overlay")
+
+# ─── Py3.14 ctypes 64 位截断修复 ───────────────────────────────────────────
+# Python 3.14 对 ctypes 的默认参数类型做了更严格的检查：未声明 argtypes 时，
+# HANDLE/HWND/HDC/HBITMAP 等 64 位句柄会被当成 32 位有符号值传入/返回，
+# 高位丢失 → CreateDIBSection/UpdateLayeredWindow 等返回/接收无效句柄，
+# 表现为 UpdateLayeredWindow 报 87(ERROR_INVALID_PARAMETER)、叠加层恒空白。
+# 这里统一声明整套 GDI/User32 API 的 argtypes/restype。
+def _setup_win32_argtypes():
+    u = ctypes.windll.user32
+    g = ctypes.windll.gdi32
+    try:
+        u.GetDC.argtypes = [wintypes.HWND]
+        u.GetDC.restype = wintypes.HDC
+        u.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
+        u.ReleaseDC.restype = ctypes.c_int
+        u.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+        u.ShowWindow.restype = ctypes.c_int
+        u.DestroyWindow.argtypes = [wintypes.HWND]
+        u.DestroyWindow.restype = ctypes.c_int
+        u.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
+        u.GetWindowLongW.restype = ctypes.c_long
+        u.DefWindowProcW.argtypes = [
+            wintypes.HWND, wintypes.UINT,
+            ctypes.c_ulonglong, ctypes.c_ulonglong,
+        ]
+        u.DefWindowProcW.restype = ctypes.c_ulonglong
+        u.RegisterClassW.argtypes = [ctypes.c_void_p]
+        u.RegisterClassW.restype = ctypes.c_ushort
+        u.CreateWindowExW.argtypes = [
+            wintypes.DWORD, ctypes.c_wchar_p, ctypes.c_wchar_p,
+            wintypes.DWORD, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+            wintypes.HWND, wintypes.HWND, wintypes.HANDLE, ctypes.c_void_p,
+        ]
+        u.CreateWindowExW.restype = wintypes.HWND
+        u.SetLayeredWindowAttributes.argtypes = [
+            wintypes.HWND, wintypes.COLORREF, ctypes.c_byte, wintypes.DWORD,
+        ]
+        u.SetLayeredWindowAttributes.restype = ctypes.c_int
+
+        # UpdateLayeredWindow：hwnd/hdc 为 64 位句柄，未声明会被截断 → 87
+        class BLENDFUNCTION(ctypes.Structure):
+            _fields_ = [
+                ("BlendOp", ctypes.c_byte),
+                ("BlendFlags", ctypes.c_byte),
+                ("SourceConstantAlpha", ctypes.c_byte),
+                ("AlphaFormat", ctypes.c_byte),
+            ]
+        u.UpdateLayeredWindow.argtypes = [
+            wintypes.HWND, wintypes.HDC,
+            ctypes.POINTER(wintypes.POINT), ctypes.POINTER(wintypes.SIZE),
+            wintypes.HDC, ctypes.POINTER(wintypes.POINT),
+            wintypes.COLORREF, ctypes.POINTER(BLENDFUNCTION), wintypes.DWORD,
+        ]
+        u.UpdateLayeredWindow.restype = wintypes.BOOL
+
+        # 关键：CreateDIBSection 返回 HBITMAP（>2^31），必须声明 restype
+        g.CreateCompatibleDC.argtypes = [wintypes.HDC]
+        g.CreateCompatibleDC.restype = wintypes.HDC
+        g.DeleteDC.argtypes = [wintypes.HDC]
+        g.DeleteDC.restype = ctypes.c_int
+        g.DeleteObject.argtypes = [ctypes.c_void_p]
+        g.DeleteObject.restype = ctypes.c_int
+        g.SelectObject.argtypes = [wintypes.HDC, ctypes.c_void_p]
+        g.SelectObject.restype = ctypes.c_void_p
+        g.CreateDIBSection.argtypes = [
+            wintypes.HDC, ctypes.c_void_p, ctypes.c_uint,
+            ctypes.POINTER(ctypes.c_void_p), ctypes.c_void_p, ctypes.c_uint,
+        ]
+        g.CreateDIBSection.restype = wintypes.HBITMAP
+    except Exception as e:  # pragma: no cover - 防御性
+        logger.warning(f"设置 Win32 argtypes 失败（忽略）: {e}")
+
+
+_setup_win32_argtypes()
 
 # 尝试使用 pywin32
 use_pywin32 = False
@@ -411,12 +487,14 @@ class OverlayManager:
 
             hdc_screen = user32.GetDC(None)
 
-            user32.UpdateLayeredWindow(
+            ret = user32.UpdateLayeredWindow(
                 self.hwnd, hdc_screen,
                 None, ctypes.byref(size),
                 self.hdc_mem, ctypes.byref(src_pos),
                 0, ctypes.byref(blend), ULW_ALPHA
             )
+            if not ret:
+                logger.error(f"更新窗口失败: UpdateLayeredWindow 返回 0, GetLastError={ctypes.windll.kernel32.GetLastError()}")
 
             user32.ReleaseDC(None, hdc_screen)
         except Exception as e:
@@ -458,6 +536,7 @@ class OverlayManager:
         if self._pygame_ok:
             try:
                 import pygame
+                pygame.font.init()  # 确保字体模块可用（插件用 pygame.font.Font）
                 self._pygame_surface = pygame.Surface((w, h), pygame.SRCALPHA)
                 logger.info(f"pygame 渲染表面重建: {w}x{h}")
             except Exception as e:

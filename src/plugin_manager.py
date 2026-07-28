@@ -112,6 +112,10 @@ class PluginManager:
                 return
 
             plugin.on_init(context)
+            # 集中注入常用 context 句柄，避免各插件重复取值且缺失时抛 AttributeError
+            plugin.overlay = context.get('overlay')
+            plugin.config = context.get('config', plugin.config if hasattr(plugin, 'config') else None)
+            plugin.data_provider = context.get('data_provider')
             self.plugins[plugin.name] = plugin
             logger.info(f"插件已加载: {plugin.name} v{plugin.version}")
 
