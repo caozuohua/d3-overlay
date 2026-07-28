@@ -102,10 +102,10 @@ class HotkeyManager:
             if user32.RegisterHotKey(None, hotkey_id, mod, vk):
                 self._hotkeys[hotkey_id] = (hotkey_str, callback)
                 logger.info(f"热键已注册: {hotkey_str} (id={hotkey_id})")
-
-                # 启动消息循环（如果还没启动）
-                if not self._running:
-                    self._start_message_loop()
+                # 注意：不在此启动后台消息循环。WM_HOTKEY 由 RegisterHotKey 投递到
+                # 注册线程（主线程），由主循环的 poll() 统一派发（见 main.run）。
+                # 早期版本启动的后台 GetMessageW 线程会与主线程 poll 争夺同一消息，
+                # 导致热键偶尔/永远不触发（线程不安全 + 双重消费者）。
             else:
                 logger.error(f"热键注册失败: {hotkey_str} (可能被其他程序占用)")
                 hotkey_id = -1
@@ -160,26 +160,3 @@ class HotkeyManager:
                     callback()
                 except Exception as e:
                     logger.error(f"热键回调执行失败 [{hotkey_str}]: {e}")
-
-    def _start_message_loop(self):
-        """启动热键消息循环（后台线程）"""
-        self._running = True
-
-        def message_loop():
-            msg = wintypes.MSG()
-            while self._running:
-                # 使用 GetMessageW 阻塞等待消息
-                result = user32.GetMessageW(ctypes.byref(msg), None, WM_HOTKEY, WM_HOTKEY)
-                if result <= 0:
-                    break
-                hotkey_id = msg.wParam
-                if hotkey_id in self._hotkeys:
-                    hotkey_str, callback = self._hotkeys[hotkey_id]
-                    try:
-                        callback()
-                    except Exception as e:
-                        logger.error(f"热键回调执行失败 [{hotkey_str}]: {e}")
-
-        self._thread = threading.Thread(target=message_loop, daemon=True, name="HotkeyLoop")
-        self._thread.start()
-        logger.info("热键消息循环已启动")
