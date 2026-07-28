@@ -468,8 +468,11 @@ class OverlayManager:
                 src = arr.tobytes()
             except ImportError:
                 src = buf
-            # self._pixels 是 ctypes 数组，用 memoryview 切片赋值最快
+            # self._pixels 现在是 Python 层自有的 bytearray（避免 DIB section
+            # 内存映射在某些 Windows 保护策略下变成只读）。写回完成后用
+            # ctypes.memmove 拷进 DIB section，同样由 end_frame 推屏。
             self._pixels[:n] = src[:n]
+            ctypes.memmove(self._pixels_ptr, self._pixels, n)
         except Exception as e:
             logger.error(f"pygame 像素写回 DIB 失败: {e}")
 
@@ -601,13 +604,20 @@ class OverlayManager:
             gdi32.SelectObject(self.hdc_mem, self.hbitmap)
 
             buf_size = w * h * 4
-            self._pixels = (ctypes.c_byte * buf_size).from_address(pixels_ptr.value)
+            # 不在 Python 层直接映射 DIB section 内存（某些 Windows 内存保护
+            # 配置下 from_address 会得到只读视图，导致每帧写回报
+            # "assignment destination is read-only"）。改用 bytearray 自持有
+            # 一块可写缓冲，每帧通过 ctypes.memmove 拷进 DIB section，性能
+            # 开销极小（1280x720 ≈ 3.5MB/帧，memmove 在内存带宽内）。
+            self._pixels = bytearray(buf_size)
+            self._pixels_ptr = pixels_ptr.value
 
             user32.ReleaseDC(None, hdc_screen)
             logger.info(f"渲染缓冲(DIBSection)重建: {w}x{h}")
         except Exception as e:
             logger.error(f"创建 DIBSection 失败: {e}")
             self._pixels = None
+            self._pixels_ptr = None
 
     def destroy(self):
         """销毁叠加窗口"""
