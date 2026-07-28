@@ -13,3 +13,13 @@ _tmp_*.json
 # OS
 Thumbs.db
 Desktop.ini
+
+# Local artifacts / probes
+.codegraph/
+.hermes/
+RUNNING_LOG.md
+_screen.png
+_probe*.txt
+_boot_out.txt
+check_wintypes.py
+test_window.py
