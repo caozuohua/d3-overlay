@@ -17,6 +17,18 @@ logger = logging.getLogger("D3OA.Overlay")
 # 高位丢失 → CreateDIBSection/UpdateLayeredWindow 等返回/接收无效句柄，
 # 表现为 UpdateLayeredWindow 报 87(ERROR_INVALID_PARAMETER)、叠加层恒空白。
 # 这里统一声明整套 GDI/User32 API 的 argtypes/restype。
+
+
+class BLENDFUNCTION(ctypes.Structure):
+    """UpdateLayeredWindow 的混合参数（模块级唯一定义，argtypes 与调用方必须用同一个类）"""
+    _fields_ = [
+        ("BlendOp", ctypes.c_byte),
+        ("BlendFlags", ctypes.c_byte),
+        ("SourceConstantAlpha", ctypes.c_byte),
+        ("AlphaFormat", ctypes.c_byte),
+    ]
+
+
 def _setup_win32_argtypes():
     u = ctypes.windll.user32
     g = ctypes.windll.gdi32
@@ -50,13 +62,6 @@ def _setup_win32_argtypes():
         u.SetLayeredWindowAttributes.restype = ctypes.c_int
 
         # UpdateLayeredWindow：hwnd/hdc 为 64 位句柄，未声明会被截断 → 87
-        class BLENDFUNCTION(ctypes.Structure):
-            _fields_ = [
-                ("BlendOp", ctypes.c_byte),
-                ("BlendFlags", ctypes.c_byte),
-                ("SourceConstantAlpha", ctypes.c_byte),
-                ("AlphaFormat", ctypes.c_byte),
-            ]
         u.UpdateLayeredWindow.argtypes = [
             wintypes.HWND, wintypes.HDC,
             ctypes.POINTER(wintypes.POINT), ctypes.POINTER(wintypes.SIZE),
@@ -247,7 +252,13 @@ class OverlayManager:
             wc = WNDCLASSEX()
             wc.cbSize = ctypes.sizeof(WNDCLASSEX)
             wc.style = 0
-            wc.lpfnWndProc = ctypes.CFUNCTYPE(LRESULT, ctypes.wintypes.HWND, ctypes.c_uint, ctypes.wintypes.WPARAM, ctypes.wintypes.LPARAM)(wndproc)
+            # 关键：CFUNCTYPE 回调必须保存引用（self._wndproc_ref），
+            # 否则注册后被 GC 回收，Windows 一回调就 access violation。
+            self._wndproc_ref = ctypes.CFUNCTYPE(
+                LRESULT, ctypes.wintypes.HWND, ctypes.c_uint,
+                ctypes.wintypes.WPARAM, ctypes.wintypes.LPARAM
+            )(wndproc)
+            wc.lpfnWndProc = self._wndproc_ref
             wc.cbClsExtra = 0
             wc.cbWndExtra = 0
             wc.hInstance = hinstance
@@ -285,12 +296,11 @@ class OverlayManager:
                 logger.error("窗口创建失败")
                 return False
 
-            # 设置透明度
-            user32.SetLayeredWindowAttributes(
-                self.hwnd, 0,
-                int(self._opacity * 255),
-                LWA_ALPHA
-            )
+            # 注意：不能调用 SetLayeredWindowAttributes！
+            # MSDN：对分层窗口调用过 SetLayeredWindowAttributes 后，
+            # UpdateLayeredWindow 将一直失败(ERROR_INVALID_PARAMETER=87)，
+            # 直到重置 WS_EX_LAYERED。整体透明度由 end_frame 的
+            # BLENDFUNCTION.SourceConstantAlpha 承担。
 
             # 显示窗口
             user32.ShowWindow(self.hwnd, SW_SHOWNA)
@@ -381,14 +391,9 @@ class OverlayManager:
         if self.hwnd:
             if use_pywin32:
                 win32gui.SetLayeredWindowAttributes(self.hwnd, 0, int(self._opacity * 255), win32con.LWA_ALPHA)
-            else:
-                user32 = ctypes.windll.user32
-                LWA_ALPHA = 0x00000002
-                user32.SetLayeredWindowAttributes(
-                    self.hwnd, 0,
-                    int(self._opacity * 255),
-                    LWA_ALPHA
-                )
+            # ctypes 分支：不能调 SetLayeredWindowAttributes（会使
+            # UpdateLayeredWindow 永久返回 87）。透明度在 end_frame 里
+            # 通过 BLENDFUNCTION.SourceConstantAlpha 应用，下一帧生效。
 
     def set_click_through(self, enabled: bool):
         """启用/禁用点击穿透"""
@@ -457,33 +462,21 @@ class OverlayManager:
         try:
             user32 = ctypes.windll.user32
 
-            class POINT(ctypes.Structure):
-                _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
-
-            class SIZE(ctypes.Structure):
-                _fields_ = [("cx", ctypes.c_long), ("cy", ctypes.c_long)]
-
-            class BLENDFUNCTION(ctypes.Structure):
-                _fields_ = [
-                    ("BlendOp", ctypes.c_byte),
-                    ("BlendFlags", ctypes.c_byte),
-                    ("SourceConstantAlpha", ctypes.c_byte),
-                    ("AlphaFormat", ctypes.c_byte),
-                ]
-
             AC_SRC_OVER = 0x00
             AC_SRC_ALPHA = 0x01
             ULW_ALPHA = 0x00000002
 
+            # 注意：必须用 wintypes.POINT/SIZE 和模块级 BLENDFUNCTION——
+            # argtypes 已按这些类型声明，ctypes 校验指针类型时认"类"不认"结构"，
+            # 本地同构类会报 expected LP_SIZE instance。
             blend = BLENDFUNCTION()
             blend.BlendOp = AC_SRC_OVER
             blend.BlendFlags = 0
-            blend.SourceConstantAlpha = 255
+            blend.SourceConstantAlpha = int(self._opacity * 255)  # 整体透明度在此应用
             blend.AlphaFormat = AC_SRC_ALPHA
 
-            wnd_pos = POINT(0, 0)
-            size = SIZE(self._width, self._height)
-            src_pos = POINT(0, 0)
+            size = wintypes.SIZE(self._width, self._height)
+            src_pos = wintypes.POINT(0, 0)
 
             hdc_screen = user32.GetDC(None)
 
