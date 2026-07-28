@@ -69,6 +69,13 @@ class Plugin(PluginBase):
             self._error_msg = "未设置 BattleTag"
             return
 
+        # 需要 Blizzard API 凭证才能拉取数据（client_id/client_secret 或 access_token）
+        has_creds = (self.config.get('data.client_id') and self.config.get('data.client_secret')) \
+                    or self.config.get('data.access_token')
+        if not has_creds:
+            self._error_msg = "缺少 Blizzard API 凭证"
+            return
+
         try:
             if self.data_provider:
                 self._profile_data = self.data_provider.get_profile(battle_tag)
@@ -120,7 +127,10 @@ class Plugin(PluginBase):
             if self._error_msg:
                 err = font_text.render(self._error_msg, True, (200, 100, 100))
                 surface.blit(err, (x + 8, y + 30))
-                hint = font_skill.render("请在设置中填写 BattleTag", True, (150, 150, 150))
+                if self._error_msg == "缺少 Blizzard API 凭证":
+                    hint = font_skill.render("在 config.json 填 client_id/client_secret", True, (150, 150, 150))
+                else:
+                    hint = font_skill.render("在 config.json 填 data.battle_tag", True, (150, 150, 150))
                 surface.blit(hint, (x + 8, y + 48))
                 return
 
