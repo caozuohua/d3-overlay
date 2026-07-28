@@ -113,6 +113,7 @@ class OverlayManager:
         self.hdc_mem = None
         self.hbitmap = None
         self.visible = False
+        self.user_hidden = False  # F8 手动隐藏标志，游戏同步循环需尊重它
         self._width = 0
         self._height = 0
         self._pixels = None
@@ -172,8 +173,12 @@ class OverlayManager:
                 logger.error("窗口创建失败")
                 return False
 
-            # 设置窗口为分层窗口
-            win32gui.SetLayeredWindowAttributes(self.hwnd, 0, int(self._opacity * 255), win32con.LWA_ALPHA)
+            # 注意：pywin32 分支也【绝不】能调用 SetLayeredWindowAttributes！
+            # 一旦对分层窗口调用过它（"color-key/alpha" 模式），后续
+            # end_frame 里的 UpdateLayeredWindow（"bitmap" 模式）会永久返回
+            # ERROR_INVALID_PARAMETER(87)，叠加层每帧刷屏报错。
+            # 透明度统一由 end_frame 的 BLENDFUNCTION.SourceConstantAlpha 承担，
+            # 这与 ctypes 分支的行为保持一致。
 
             # 显示窗口
             win32gui.ShowWindow(self.hwnd, win32con.SW_SHOWNA)
@@ -318,6 +323,9 @@ class OverlayManager:
 
     def show(self):
         """显示叠加窗口"""
+        # 用户曾手动隐藏(F8)时，不响应自动 show()
+        if self.user_hidden:
+            return
         if self.hwnd and not self.visible:
             if use_pywin32:
                 win32gui.ShowWindow(self.hwnd, win32con.SW_SHOWNA)
@@ -335,12 +343,16 @@ class OverlayManager:
                 user32 = ctypes.windll.user32
                 user32.ShowWindow(self.hwnd, 0)  # SW_HIDE
             self.visible = False
+        # 游戏关闭/失焦导致的隐藏不锁定 user_hidden（下次游戏开始可正常显示）；
+        # 仅 F8/老板键的主动隐藏会置 user_hidden=True。此处保持现状即可。
 
     def toggle_visibility(self):
-        """切换可见性"""
+        """切换可见性（F8）。手动隐藏后用 user_hidden 锁住，直到再次按下 F8 解除。"""
         if self.visible:
+            self.user_hidden = True
             self.hide()
         else:
+            self.user_hidden = False
             self.show()
 
     def sync_to_game_window(self):
@@ -390,7 +402,10 @@ class OverlayManager:
         self._opacity = max(0.0, min(1.0, alpha))
         if self.hwnd:
             if use_pywin32:
-                win32gui.SetLayeredWindowAttributes(self.hwnd, 0, int(self._opacity * 255), win32con.LWA_ALPHA)
+                # 注意：pywin32 分支同样不能调 SetLayeredWindowAttributes，
+                # 否则会让 end_frame 的 UpdateLayeredWindow 永久返回 87。
+                # 透明度改在下一帧 end_frame 的 BLENDFUNCTION.SourceConstantAlpha 生效。
+                pass
             # ctypes 分支：不能调 SetLayeredWindowAttributes（会使
             # UpdateLayeredWindow 永久返回 87）。透明度在 end_frame 里
             # 通过 BLENDFUNCTION.SourceConstantAlpha 应用，下一帧生效。
@@ -442,8 +457,19 @@ class OverlayManager:
             import pygame
             buf = pygame.image.tostring(self._pygame_surface, 'BGRA')
             n = min(len(buf), len(self._pixels))
+            # UpdateLayeredWindow + AC_SRC_ALPHA 要求“预乘 alpha”，但 pygame
+            # SRCALPHA 存的是“直 alpha”。若直接写入，半透明像素颜色会偏亮。
+            # 这里用 numpy 做预乘（无 numpy 时降级为直出，仅画质略差）。
+            try:
+                import numpy as np
+                arr = np.frombuffer(buf, dtype=np.uint8).reshape(-1, 4)
+                a = arr[:, 3:4].astype(np.uint16)  # alpha 0-255
+                arr[:, 0:3] = (arr[:, 0:3].astype(np.uint16) * a // 255).astype(np.uint8)
+                src = arr.tobytes()
+            except ImportError:
+                src = buf
             # self._pixels 是 ctypes 数组，用 memoryview 切片赋值最快
-            self._pixels[:n] = buf[:n]
+            self._pixels[:n] = src[:n]
         except Exception as e:
             logger.error(f"pygame 像素写回 DIB 失败: {e}")
 
@@ -630,19 +656,31 @@ class OverlayManager:
         logger.info(f"布局切换到: {next_pos}")
 
     def place(self, x: int, y: int) -> tuple:
-        """F5 修复：把插件的基坐标（以 top-left 为原点）映射到当前布局角落。
+        """把插件的基坐标映射到当前布局角落。
 
-        画布尺寸为 self._width/self._height；面板以 20px 边距对齐到所选角落。
+        各插件在配置里声明自己的堆叠槽位 (x, y)（如 timer=[20,20]、
+        build_info=[20,120]），y 表示在该角落竖直堆叠的偏移。本方法据此
+        把 (x, y) 对齐到所选角落，使 4 个面板不再重叠。
+
+        - 左/右：靠左或右边缘；
+        - 上/下：从顶部或底部开始，按 y 竖直堆叠。
         """
         margin = 20
+        # 各面板最大宽度（取最宽的 build_info=260），用于右对齐
+        max_panel_w = 260
         w, h = self._width, self._height
         corner = getattr(self, '_layout', self.config.get('overlay.position', 'top-right'))
-        if corner == 'top-left':
-            return (margin, margin)
-        if corner == 'top-right':
-            return (max(margin, w - x - 260), margin) if w else (margin, margin)
-        if corner == 'bottom-left':
-            return (margin, max(margin, h - y - 200)) if h else (margin, margin)
-        if corner == 'bottom-right':
-            return (max(margin, w - x - 260), max(margin, h - y - 200)) if (w and h) else (margin, margin)
-        return (x, y)
+
+        # 水平锚点
+        if 'right' in corner:
+            base_x = max(margin, (w or 0) - max_panel_w - margin)
+        else:  # left
+            base_x = margin + max(0, x - 20)  # 保留插件自身水平缩进
+
+        # 竖直锚点（按 y 槽位堆叠）
+        if 'bottom' in corner:
+            base_y = max(margin, (h or 0) - (y + 200))  # 底部向上堆叠
+        else:  # top
+            base_y = margin + max(0, y - 20)
+
+        return (base_x, base_y)
