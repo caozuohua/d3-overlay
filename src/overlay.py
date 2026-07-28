@@ -457,22 +457,22 @@ class OverlayManager:
             import pygame
             buf = pygame.image.tostring(self._pygame_surface, 'BGRA')
             n = min(len(buf), len(self._pixels))
-            # UpdateLayeredWindow + AC_SRC_ALPHA 要求“预乘 alpha”，但 pygame
-            # SRCALPHA 存的是“直 alpha”。若直接写入，半透明像素颜色会偏亮。
-            # 这里用 numpy 做预乘（无 numpy 时降级为直出，仅画质略差）。
-            try:
-                import numpy as np
-                arr = np.frombuffer(buf, dtype=np.uint8).reshape(-1, 4)
-                a = arr[:, 3:4].astype(np.uint16)  # alpha 0-255
-                arr[:, 0:3] = (arr[:, 0:3].astype(np.uint16) * a // 255).astype(np.uint8)
-                src = arr.tobytes()
-            except ImportError:
-                src = buf
-            # self._pixels 现在是 Python 层自有的 bytearray（避免 DIB section
-            # 内存映射在某些 Windows 保护策略下变成只读）。写回完成后用
-            # ctypes.memmove 拷进 DIB section，同样由 end_frame 推屏。
-            self._pixels[:n] = src[:n]
-            ctypes.memmove(self._pixels_ptr, self._pixels, n)
+            # pygame SRCALPHA 是直 alpha，而 UpdateLayeredWindow + AC_SRC_ALPHA
+            # 要求预乘 alpha。这里在 Python 层自有的 bytearray 上做预乘，
+            # 避免 numpy 不可用（DLL/路径过长等）时报错。
+            bv = memoryview(self._pixels)
+            for i in range(0, n, 4):
+                a = bv[i + 3]
+                if a:
+                    bv[i]     = (bv[i]     * a) // 255
+                    bv[i + 1] = (bv[i + 1] * a) // 255
+                    bv[i + 2] = (bv[i + 2] * a) // 255
+                # alpha 通道保持原值
+            ctypes.memmove(
+                self._pixels_ptr,
+                (ctypes.c_byte * n).from_buffer(self._pixels),
+                n,
+            )
         except Exception as e:
             logger.error(f"pygame 像素写回 DIB 失败: {e}")
 
