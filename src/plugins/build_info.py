@@ -105,15 +105,19 @@ class Plugin(PluginBase):
         if self.overlay and hasattr(self.overlay, 'place'):
             x, y = self.overlay.place(x, y)
         panel_w, panel_h = 260, 160
-
-        # 背景
+        # 背景：高对比度蓝金暗底
+        panel_w, panel_h = 260, 160
         bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-        bg.fill((10, 8, 5, 200))
+        bg.fill((30, 50, 100, 220))
         surface.blit(bg, (x, y))
 
-        # 边框
-        pygame.draw.rect(surface, (120, 90, 40, 200),
-                         (x, y, panel_w, panel_h), 1, border_radius=4)
+        # 虚线描边
+        for i in range(0, panel_w, 8):
+            pygame.draw.line(surface, (100, 180, 255, 230), (x + i, y), (x + i + 4, y))
+            pygame.draw.line(surface, (100, 180, 255, 230), (x + i, y + panel_h - 1), (x + i + 4, y + panel_h - 1))
+        for i in range(0, panel_h, 8):
+            pygame.draw.line(surface, (100, 180, 255, 230), (x, y + i), (x, y + i + 4))
+            pygame.draw.line(surface, (100, 180, 255, 230), (x + panel_w - 1, y + i), (x + panel_w - 1, y + i + 4))
 
         try:
             font_title = pygame.font.SysFont("Microsoft YaHei", 12, bold=True)
