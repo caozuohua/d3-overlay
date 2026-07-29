@@ -50,6 +50,7 @@ class Plugin(PluginBase):
 
     def on_init(self, context: dict):
         self.config = context['config']
+        self.overlay = context.get('overlay')
         self.data_provider = context.get('data_provider')
         self._profile_data = None
         self._hero_data = None
@@ -127,6 +128,12 @@ class Plugin(PluginBase):
             # 标题
             title = font_title.render("📋 构筑信息", True, (255, 165, 0))
             surface.blit(title, (x + 8, y + 6))
+
+            battle_tag = self.config.get('data.battle_tag', '')
+            if not battle_tag:
+                placeholder = font_text.render("本地数据模式 / 等待日志事件", True, (150, 150, 150))
+                surface.blit(placeholder, (x + 8, y + 30))
+                return
 
             if self._error_msg:
                 err = font_text.render(self._error_msg, True, (200, 100, 100))

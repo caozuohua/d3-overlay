@@ -12,7 +12,6 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-
 def test_plugin_gets_overlay_injected():
     """F8: PluginManager 应在加载后注入 plugin.overlay（避免 AttributeError）。"""
     from plugin_manager import PluginManager
@@ -65,6 +64,28 @@ def test_plugin_render_does_not_raise_on_real_surface():
         except Exception as e:
             # 其它渲染细节错误（如缺数据）允许，但 'font not initialized' 不允许
             assert "font not initialized" not in str(e), f"{p.name} 字体未初始化: {e}"
+
+
+def test_build_info_without_credentials_shows_local_mode():
+    import pygame
+    from plugins.build_info import Plugin as BuildPlugin
+    class FakeConfig:
+        def get(self, path, default=None):
+            if path == 'data.battle_tag':
+                return ''
+            if path == 'data.access_token':
+                return ''
+            if path == 'data.client_id':
+                return ''
+            if path == 'data.client_secret':
+                return ''
+            return default
+    p = BuildPlugin()
+    p.on_init({'config': FakeConfig(), 'data_provider': None})
+    surface = pygame.Surface((260, 160), pygame.SRCALPHA)
+    # Should not raise
+    p.on_render(surface)
+    assert surface.get_width() == 260
 
 
 if __name__ == "__main__":
