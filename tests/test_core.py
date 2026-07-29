@@ -244,6 +244,40 @@ def test_surface_contract_mismatch():
     assert "blit" in src, "插件本应调用 surface.blit()"
 
 
+# ───────────────────────────────────────────────────────
+# 6) Typed EventBus（Phase 3 Task 8）
+# ───────────────────────────────────────────────────────
+def test_event_bus_publish_and_listen():
+    from event_bus import EventBus
+    bus = EventBus()
+    received = []
+    bus.subscribe('rift_event', lambda e: received.append(('rift', e)))
+    bus.subscribe('nemesis', lambda e: received.append(('nemesis', e)))
+    bus.publish('rift_event', {'type': 'rift_event', 'rift_id': 'r1'})
+    bus.publish('nemesis', {'type': 'nemesis', 'nemesis_state': 'appeared'})
+    assert len(received) == 2
+    assert received[0][0] == 'rift'
+    assert received[1][0] == 'nemesis'
+
+
+def test_event_bus_process_log_events():
+    from event_bus import EventBus
+    bus = EventBus()
+    counts = {}
+    def count(e):
+        counts[e.get('type')] = counts.get(e.get('type'), 0) + 1
+    bus.subscribe('rift_event', count)
+    bus.subscribe('rift_progress', count)
+    events = [
+        {'type': 'rift_event', 'rift_id': 'r1'},
+        {'type': 'rift_progress', 'progress': 0.5},
+        {'type': 'rift_event', 'rift_id': 'r1'},  # duplicate type ignored
+    ]
+    bus.process_log_events(events)
+    assert counts.get('rift_event') == 1
+    assert counts.get('rift_progress') == 1
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

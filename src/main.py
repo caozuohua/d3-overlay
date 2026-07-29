@@ -283,10 +283,14 @@ class D3OverlayApp:
 
     def _collect_game_data(self) -> dict:
         """收集游戏相关数据"""
+        events = self.data_provider.get_log_events()
+        bus = EventBus()
+        bus.process_log_events(events)
         return {
             'game_running': self.game_monitor.is_game_running(),
             'game_foreground': self.game_monitor.is_foreground(),
-            'log_events': self.data_provider.get_log_events(),
+            'log_events': events,
+            'event_bus': bus,
             'timestamp': time.time(),
         }
 
