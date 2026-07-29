@@ -89,6 +89,7 @@ class HotkeyManager:
         self.config = config
         self._hotkeys = {}  # id -> (hotkey_str, callback)
         self._next_id = 1
+        self._thread = None  # backward compat for tests asserting no thread
 
     def register(self, hotkey_str: str, callback) -> int:
         """注册全局热键"""
