@@ -191,9 +191,14 @@ class Plugin(PluginBase):
 
         # 标题
         try:
-            font_title = pygame.font.SysFont("Microsoft YaHei", 12, bold=True)
-            font_time = pygame.font.SysFont("Consolas", 24, bold=True)
-            font_small = pygame.font.SysFont("Microsoft YaHei", 11)
+            if self.overlay and hasattr(self.overlay, 'get_font'):
+                font_title = self.overlay.get_font("Microsoft YaHei", 12)
+                font_time = self.overlay.get_font("Consolas", 24)
+                font_small = self.overlay.get_font("Microsoft YaHei", 11)
+            else:
+                font_title = pygame.font.Font(None, 12)
+                font_time = pygame.font.Font(None, 24)
+                font_small = pygame.font.Font(None, 11)
 
             # 标题行
             title = font_title.render("⏱ 秘境计时器", True, (255, 165, 0))

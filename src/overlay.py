@@ -141,6 +141,8 @@ class OverlayManager:
         # 面板拖拽状态（MovableSystem）
         self._panel_rects = {}
         self._drag = None
+        # 字体缓存（按 (name, size) 缓存 pygame.font.SysFont）
+        self._font_cache = {}
 
     def register_panel_rect(self, name, rect):
         """注册插件面板的当前矩形，供拖拽命中测试使用。"""
@@ -175,6 +177,14 @@ class OverlayManager:
             self.config.set(f'plugins.{name}.position', [int(x), int(y)])
         except Exception as e:
             logger.error(f"保存面板位置失败: {e}")
+
+    def get_font(self, name, size):
+        """获取字体（带缓存）。"""
+        key = (name, size)
+        if key not in self._font_cache:
+            import pygame
+            self._font_cache[key] = pygame.font.SysFont(name, size)
+        return self._font_cache[key]
 
     def create(self) -> bool:
         """创建透明叠加窗口"""
