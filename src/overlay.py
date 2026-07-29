@@ -457,6 +457,9 @@ class OverlayManager:
             import pygame
             buf = pygame.image.tostring(self._pygame_surface, 'BGRA')
             n = min(len(buf), len(self._pixels))
+            # 先把插件绘制的像素拷进自有 bytearray，再在自有内存上做预乘，
+            # 最后以 ctypes.memmove 写回 DIB section，避开只读映射。
+            self._pixels[:n] = buf[:n]
             # pygame SRCALPHA 是直 alpha，而 UpdateLayeredWindow + AC_SRC_ALPHA
             # 要求预乘 alpha。这里在 Python 层自有的 bytearray 上做预乘，
             # 避免 numpy 不可用（DLL/路径过长等）时报错。
