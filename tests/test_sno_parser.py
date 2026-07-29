@@ -21,3 +21,20 @@ def test_sno_parser_parse_returns_none():
 
 def test_is_sno_available_returns_false():
     assert is_sno_available() is False
+
+
+if __name__ == "__main__":
+    tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
+    failed = 0
+    for t in tests:
+        try:
+            t()
+            print(f"  PASS  {t.__name__}")
+        except AssertionError as e:
+            failed += 1
+            print(f"  FAIL  {t.__name__}: {e}")
+        except Exception as e:
+            failed += 1
+            print(f"  ERROR {t.__name__}: {type(e).__name__}: {e}")
+    print(f"\n{len(tests)-failed}/{len(tests)} passed")
+    sys.exit(1 if failed else 0)
