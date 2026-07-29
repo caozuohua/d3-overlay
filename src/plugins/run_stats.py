@@ -1,0 +1,80 @@
+"""
+D3OA 插件 — Run 统计（占位）
+
+记录游戏 Run 次数，供后续扩展。
+"""
+
+import logging
+from plugin_manager import PluginBase
+
+logger = logging.getLogger("D3OA.Plugin.RunStats")
+
+
+class Plugin(PluginBase):
+    """Run 统计（占位）"""
+
+    @property
+    def name(self) -> str:
+        return "RunStats"
+
+    @property
+    def version(self) -> str:
+        return "0.1.0"
+
+    @property
+    def description(self) -> str:
+        return "Run 统计（占位）"
+
+    def on_init(self, context: dict):
+        self.config = context['config']
+        self.overlay = context.get('overlay')
+        self.data_provider = context.get('data_provider')
+        self._run_count = 0
+        self._total_time = 0.0
+        logger.info("RunStats 插件初始化完成")
+
+    def on_update(self, delta_time: float, game_data: dict):
+        events = game_data.get('log_events', [])
+        for event in events:
+            event_type = event.get('type', '')
+            if event_type == 'new_game':
+                self._run_count += 1
+
+    def on_render(self, surface):
+        """渲染 RunStats 面板"""
+        try:
+            import pygame
+        except ImportError:
+            return
+
+        pos = self.config.get('plugins.run_stats.position', [20, 600])
+        x, y = pos
+        if self.overlay and hasattr(self.overlay, 'place'):
+            x, y = self.overlay.place(x, y)
+
+        panel_w, panel_h = 200, 40
+        bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        bg.fill((20, 80, 20, 210))
+        surface.blit(bg, (x, y))
+
+        dash_color = (100, 255, 100, 240)
+        for i in range(0, panel_w, 8):
+            pygame.draw.line(surface, dash_color, (x + i, y), (x + i + 4, y))
+            pygame.draw.line(surface, dash_color, (x + i, y + panel_h - 1), (x + i + 4, y + panel_h - 1))
+        for i in range(0, panel_h, 8):
+            pygame.draw.line(surface, dash_color, (x, y + i), (x, y + i + 4))
+            pygame.draw.line(surface, dash_color, (x + panel_w - 1, y + i), (x + panel_w - 1, y + i + 4))
+
+        try:
+            font = pygame.font.SysFont("Microsoft YaHei", 14, bold=True)
+        except Exception:
+            font = pygame.font.Font(None, 16)
+
+        text = f"RunStats: {self._run_count} runs, {self._total_time:.0f}s"
+        text_surf = font.render(text, True, (220, 255, 220))
+        text_x = x + (panel_w - text_surf.get_width()) // 2
+        text_y = y + (panel_h - text_surf.get_height()) // 2
+        surface.blit(text_surf, (text_x, text_y))
+
+        if self.overlay and hasattr(self.overlay, 'register_panel_rect'):
+            self.overlay.register_panel_rect(self.name, pygame.Rect(x, y, panel_w, panel_h))

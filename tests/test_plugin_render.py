@@ -153,6 +153,69 @@ def test_boss_alert_resets_on_leave_game():
     assert not p._game_active
 
 
+def test_skill_cooldown_renders_placeholder():
+    """Phase 4 Task 11: SkillCooldown 插件应能渲染占位面板。"""
+    try:
+        import pygame
+    except ImportError:
+        print("  SKIP  test_skill_cooldown_renders_placeholder (pygame 未安装)")
+        return
+    from plugins.skill_cooldown import Plugin as SkillCooldownPlugin
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = SkillCooldownPlugin()
+    p.on_init({'config': FakeConfig(), 'data_provider': None})
+    surface = pygame.Surface((260, 160), pygame.SRCALPHA)
+    # Should not raise
+    p.on_render(surface)
+    assert surface.get_width() == 260
+
+
+def test_run_stats_renders_placeholder():
+    """Phase 4 Task 11: RunStats 插件应能渲染占位面板。"""
+    try:
+        import pygame
+    except ImportError:
+        print("  SKIP  test_run_stats_renders_placeholder (pygame 未安装)")
+        return
+    from plugins.run_stats import Plugin as RunStatsPlugin
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = RunStatsPlugin()
+    p.on_init({'config': FakeConfig(), 'data_provider': None})
+    surface = pygame.Surface((260, 160), pygame.SRCALPHA)
+    # Should not raise
+    p.on_render(surface)
+    assert surface.get_width() == 260
+
+
+def test_drop_tracker_renders_placeholder():
+    """Phase 4 Task 11: DropTracker 插件应能渲染占位面板。"""
+    try:
+        import pygame
+    except ImportError:
+        print("  SKIP  test_drop_tracker_renders_placeholder (pygame 未安装)")
+        return
+    from plugins.drop_tracker import Plugin as DropTrackerPlugin
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = DropTrackerPlugin()
+    p.on_init({'config': FakeConfig(), 'data_provider': None})
+    surface = pygame.Surface((260, 160), pygame.SRCALPHA)
+    # Should not raise
+    p.on_render(surface)
+    assert surface.get_width() == 260
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
