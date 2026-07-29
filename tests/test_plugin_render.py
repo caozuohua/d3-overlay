@@ -88,6 +88,71 @@ def test_build_info_without_credentials_shows_local_mode():
     assert surface.get_width() == 260
 
 
+def test_boss_alert_triggers_on_rift_complete():
+    from plugins.boss_alert import Plugin as BossAlertPlugin
+    import pygame
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = BossAlertPlugin()
+    p.on_init({'config': FakeConfig(), 'overlay': None, 'data_provider': None})
+    assert not p._boss_active
+    assert not p._game_active
+
+    p.on_update(0.016, {
+        'log_events': [
+            {'type': 'rift_event', 'raw': 'Enter Greater Rift', 'rift_type': 'greater'},
+        ]
+    })
+    assert p._game_active
+    assert not p._boss_active
+
+    p.on_update(0.016, {
+        'log_events': [
+            {'type': 'rift_event', 'raw': 'Enter Greater Rift', 'rift_type': 'greater'},
+            {'type': 'rift_progress', 'progress': 1.0},
+        ]
+    })
+    assert p._boss_active
+    assert p._boss_timestamp is not None
+
+    surface = pygame.Surface((400, 600), pygame.SRCALPHA)
+    p.on_render(surface)
+    assert surface.get_width() == 400
+    assert surface.get_height() == 600
+
+
+def test_boss_alert_resets_on_leave_game():
+    from plugins.boss_alert import Plugin as BossAlertPlugin
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = BossAlertPlugin()
+    p.on_init({'config': FakeConfig(), 'overlay': None, 'data_provider': None})
+    p.on_update(0.016, {
+        'log_events': [
+            {'type': 'rift_event', 'raw': 'Enter Rift', 'rift_type': 'nephalem'},
+            {'type': 'rift_progress', 'progress': 1.0},
+        ]
+    })
+    assert p._boss_active
+    assert p._game_active
+
+    p.on_update(0.016, {
+        'log_events': [
+            {'type': 'rift_event', 'raw': 'Enter Rift', 'rift_type': 'nephalem'},
+            {'type': 'rift_progress', 'progress': 1.0},
+            {'type': 'leave_game', 'raw': 'Leave Game'},
+        ]
+    })
+    assert not p._boss_active
+    assert not p._game_active
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
