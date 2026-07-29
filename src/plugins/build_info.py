@@ -6,6 +6,7 @@ D3OA 插件 — 构筑信息展示
 
 import logging
 import time
+from plugin_manager import PluginBase
 
 logger = logging.getLogger("D3OA.Plugin.BuildInfo")
 
@@ -32,7 +33,7 @@ CLASS_NAMES = {
 }
 
 
-class Plugin:
+class Plugin(PluginBase):
     """构筑信息展示插件"""
 
     @property
@@ -68,6 +69,13 @@ class Plugin:
             self._error_msg = "未设置 BattleTag"
             return
 
+        # 需要 Blizzard API 凭证才能拉取数据（client_id/client_secret 或 access_token）
+        has_creds = (self.config.get('data.client_id') and self.config.get('data.client_secret')) \
+                    or self.config.get('data.access_token')
+        if not has_creds:
+            self._error_msg = "缺少 Blizzard API 凭证"
+            return
+
         try:
             if self.data_provider:
                 self._profile_data = self.data_provider.get_profile(battle_tag)
@@ -94,16 +102,22 @@ class Plugin:
 
         pos = self.config.get('plugins.build_info.position', [20, 120])
         x, y = pos
+        if self.overlay and hasattr(self.overlay, 'place'):
+            x, y = self.overlay.place(x, y)
         panel_w, panel_h = 260, 160
-
-        # 背景
+        # 背景：高对比度蓝金暗底
+        panel_w, panel_h = 260, 160
         bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-        bg.fill((10, 8, 5, 200))
+        bg.fill((30, 50, 100, 220))
         surface.blit(bg, (x, y))
 
-        # 边框
-        pygame.draw.rect(surface, (120, 90, 40, 200),
-                         (x, y, panel_w, panel_h), 1, border_radius=4)
+        # 虚线描边
+        for i in range(0, panel_w, 8):
+            pygame.draw.line(surface, (100, 180, 255, 230), (x + i, y), (x + i + 4, y))
+            pygame.draw.line(surface, (100, 180, 255, 230), (x + i, y + panel_h - 1), (x + i + 4, y + panel_h - 1))
+        for i in range(0, panel_h, 8):
+            pygame.draw.line(surface, (100, 180, 255, 230), (x, y + i), (x, y + i + 4))
+            pygame.draw.line(surface, (100, 180, 255, 230), (x + panel_w - 1, y + i), (x + panel_w - 1, y + i + 4))
 
         try:
             font_title = pygame.font.SysFont("Microsoft YaHei", 12, bold=True)
@@ -117,7 +131,10 @@ class Plugin:
             if self._error_msg:
                 err = font_text.render(self._error_msg, True, (200, 100, 100))
                 surface.blit(err, (x + 8, y + 30))
-                hint = font_skill.render("请在设置中填写 BattleTag", True, (150, 150, 150))
+                if self._error_msg == "缺少 Blizzard API 凭证":
+                    hint = font_skill.render("在 config.json 填 client_id/client_secret", True, (150, 150, 150))
+                else:
+                    hint = font_skill.render("在 config.json 填 data.battle_tag", True, (150, 150, 150))
                 surface.blit(hint, (x + 8, y + 48))
                 return
 

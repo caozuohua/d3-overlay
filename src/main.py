@@ -225,18 +225,31 @@ class D3OverlayApp:
         target_fps = self.config.get('performance.target_fps', 30)
         frame_time = 1.0 / target_fps
 
+        # 叠加层默认可见（create() 已 ShowWindow）。可见性完全交给用户
+        # （Ctrl+Shift+O / 老板键），不再由“游戏是否检测到”每帧强制 hide，
+        # 否则一旦检测失败叠加层会永远不可见，且会覆盖用户的显隐操作。
+        game_was_running = False
+
         try:
             while self.running:
                 frame_start = time.time()
 
-                # 同步叠加窗口到游戏窗口
+                # 同步叠加窗口到游戏窗口（仅负责“位置/尺寸”，不负责显隐）
                 if time.time() - last_sync > sync_interval:
                     game_running = self.game_monitor.is_game_running()
+                    if game_running != game_was_running:
+                        if game_running:
+                            # 游戏出现：若用户未手动隐藏则显示并跟随
+                            if not self.overlay.user_hidden:
+                                self.overlay.show()
+                        else:
+                            # 仅在“曾运行→关闭”的边界自动隐藏一次；
+                            # 启动即未检测到游戏时不隐藏，保证叠加层可验证。
+                            if game_was_running and not self.overlay.user_hidden:
+                                self.overlay.hide()
+                        game_was_running = game_running
                     if game_running:
                         self.overlay.sync_to_game_window()
-                        self.overlay.show()
-                    else:
-                        self.overlay.hide()
                     last_sync = time.time()
 
                 # 获取游戏数据
@@ -310,6 +323,7 @@ class D3OverlayApp:
     def _on_boss_key(self):
         """老板键 — 立即隐藏叠加层"""
         logger.info("热键: 老板键，隐藏叠加层")
+        self.overlay.user_hidden = True
         self.overlay.hide()
 
     def shutdown(self):
@@ -317,11 +331,11 @@ class D3OverlayApp:
         logger.info("D3OA 正在关闭...")
         self.running = False
 
-        if self.click_simulator:
-            self.click_simulator.stop()
+        if self.game_monitor:
+            self.game_monitor.stop()  # F6: 终止监控线程
 
         if self.hotkey_manager:
-            self.hotkey_manager.unregister_all()
+            self.hotkey_manager.stop()
 
         if self.plugin_manager:
             for p in self.plugin_manager.plugins.values():
