@@ -241,3 +241,5 @@ class Plugin(PluginBase):
 
         except Exception as e:
             logger.error(f"RiftInfo 渲染失败: {e}")
+        if self.overlay and hasattr(self.overlay, 'register_panel_rect'):
+            self.overlay.register_panel_rect(self.name, pygame.Rect(x, y, panel_w, panel_h))

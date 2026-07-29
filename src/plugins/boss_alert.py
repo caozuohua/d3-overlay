@@ -114,3 +114,5 @@ class Plugin(PluginBase):
         text_x = x + (panel_w - text_surf.get_width()) // 2
         text_y = y + (panel_h - text_surf.get_height()) // 2
         surface.blit(text_surf, (text_x, text_y))
+        if self.overlay and hasattr(self.overlay, 'register_panel_rect'):
+            self.overlay.register_panel_rect(self.name, pygame.Rect(x, y, panel_w, panel_h))

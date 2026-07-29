@@ -138,6 +138,43 @@ class OverlayManager:
             self._pygame_ok = True
         except ImportError:
             logger.warning("pygame 不可用，叠加层将无内容渲染（插件依赖 pygame.Surface）")
+        # 面板拖拽状态（MovableSystem）
+        self._panel_rects = {}
+        self._drag = None
+
+    def register_panel_rect(self, name, rect):
+        """注册插件面板的当前矩形，供拖拽命中测试使用。"""
+        self._panel_rects[name] = rect
+
+    def start_drag(self, name, mouse_pos):
+        """开始拖拽面板。返回 (x, y, w, h) 或 None。"""
+        rect = self._panel_rects.get(name)
+        if rect is None:
+            return None
+        self._drag = {
+            'name': name,
+            'offset_x': mouse_pos[0] - rect.x,
+            'offset_y': mouse_pos[1] - rect.y,
+            'rect': rect,
+        }
+        return (rect.x, rect.y, rect.w, rect.h)
+
+    def update_drag(self, mouse_pos):
+        """更新拖拽位置。返回新的 (x, y) 或 None。"""
+        if not self._drag:
+            return None
+        rect = self._drag['rect']
+        rect.x = mouse_pos[0] - self._drag['offset_x']
+        rect.y = mouse_pos[1] - self._drag['offset_y']
+        return (rect.x, rect.y)
+
+    def end_drag(self, name, x, y, w, h):
+        """结束拖拽并持久化新位置到配置。"""
+        self._drag = None
+        try:
+            self.config.set(f'plugins.{name}.position', [int(x), int(y)])
+        except Exception as e:
+            logger.error(f"保存面板位置失败: {e}")
 
     def create(self) -> bool:
         """创建透明叠加窗口"""
@@ -710,3 +747,53 @@ class OverlayManager:
             base_y = margin + max(0, y - 20)
 
         return (base_x, base_y)
+
+    def register_panel_rect(self, name, rect):
+        """注册面板矩形区域，用于拖拽检测。"""
+        self._panel_rects[name] = rect
+
+    def start_drag(self, name, mouse_pos):
+        """开始拖拽面板。
+
+        Args:
+            name: 面板名称
+            mouse_pos: 当前鼠标位置 (x, y)
+
+        Returns:
+            (x, y, w, h) 拖拽初始信息，或 None 如果面板未注册。
+        """
+        rect = self._panel_rects.get(name)
+        if rect is None:
+            return None
+        self._drag = {
+            'name': name,
+            'offset_x': mouse_pos[0] - rect.x,
+            'offset_y': mouse_pos[1] - rect.y,
+            'rect': rect,
+        }
+        return (rect.x, rect.y, rect.width, rect.height)
+
+    def update_drag(self, mouse):
+        """更新拖拽位置。
+
+        Args:
+            mouse: 当前鼠标位置 (x, y)
+
+        Returns:
+            (new_x, new_y) 或 None（若无拖拽）。
+        """
+        if self._drag is None:
+            return None
+        ox = self._drag['offset_x']
+        oy = self._drag['offset_y']
+        return (mouse[0] - ox, mouse[1] - oy)
+
+    def end_drag(self, name, x, y, w, h):
+        """结束拖拽，将新位置持久化到配置。"""
+        if self._drag and self._drag['name'] == name:
+            self._drag['rect'].x = int(x)
+            self._drag['rect'].y = int(y)
+            self._drag['rect'].width = int(w)
+            self._drag['rect'].height = int(h)
+        self.config.set('plugins.' + name + '.position', [int(x), int(y)])
+        self._drag = None
