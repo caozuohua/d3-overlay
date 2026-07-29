@@ -131,8 +131,6 @@ class OverlayManager:
         self._pygame_surface = None
         self._opacity = config.get('overlay.opacity', 0.85)
         self._click_through = config.get('overlay.click_through', True)
-
- tests
         # 探测 pygame 是否可用（不可用则退化为纯像素缓冲）
         self._pygame_ok = False
         try:
