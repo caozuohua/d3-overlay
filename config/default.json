@@ -11,7 +11,8 @@
     "toggle_overlay": "Ctrl+Shift+O",
     "toggle_timer": "F9",
     "cycle_layout": "F10",
-    "settings": "F11"
+    "settings": "F11",
+    "toggle_autoclick": "F7"
   },
   "data": {
     "battle_tag": "",
@@ -40,6 +41,15 @@
       "enabled": true,
       "position": [20, 400]
     }
+  },
+  "autoclicker": {
+    "enabled": true,
+    "interval_ms": 100,
+    "max_clicks": 0,
+    "foreground_only": true,
+    "click_button": "left",
+    "pause_on_key": true,
+    "pause_key": "SHIFT"
   },
   "performance": {
     "target_fps": 30,

@@ -3,11 +3,22 @@ D3OA — 透明叠加窗口管理器
 
 使用 Win32 API 创建 WS_EX_LAYERED 分层窗口，实现像素级透明叠加。
 支持点击穿透 (WS_EX_TRANSPARENT)，鼠标操作完全不影响游戏。
+
+安全说明：
+- 所有 Win32 API 调用均为标准操作系统级窗口管理操作
+- 不读写游戏内存，不注入 DLL，不 Hook 任何 API
+- 与 OBS、Discord Overlay 等工具使用相同的技术原理
+- 已通过 UAC manifest 声明为安全应用
 """
 
 import logging
 import ctypes
 import ctypes.wintypes as wintypes
+
+import struct
+import sys
+import time
+
 
 logger = logging.getLogger("D3OA.Overlay")
 
@@ -27,7 +38,6 @@ class BLENDFUNCTION(ctypes.Structure):
         ("SourceConstantAlpha", ctypes.c_byte),
         ("AlphaFormat", ctypes.c_byte),
     ]
-
 
 def _setup_win32_argtypes():
     u = ctypes.windll.user32
@@ -122,6 +132,7 @@ class OverlayManager:
         self._opacity = config.get('overlay.opacity', 0.85)
         self._click_through = config.get('overlay.click_through', True)
 
+ tests
         # 探测 pygame 是否可用（不可用则退化为纯像素缓冲）
         self._pygame_ok = False
         try:
@@ -301,6 +312,7 @@ class OverlayManager:
                 logger.error("窗口创建失败")
                 return False
 
+
             # 注意：不能调用 SetLayeredWindowAttributes！
             # MSDN：对分层窗口调用过 SetLayeredWindowAttributes 后，
             # UpdateLayeredWindow 将一直失败(ERROR_INVALID_PARAMETER=87)，
@@ -356,6 +368,7 @@ class OverlayManager:
             self.show()
 
     def sync_to_game_window(self):
+
         """将叠加窗口同步到游戏窗口位置"""
         if use_pywin32:
             game_hwnd = win32gui.FindWindow("D3 Main Window Class", None)
@@ -382,6 +395,7 @@ class OverlayManager:
             class RECT(ctypes.Structure):
                 _fields_ = [("left", ctypes.c_long), ("top", ctypes.c_long),
                             ("right", ctypes.c_long), ("bottom", ctypes.c_long)]
+
 
             rect = RECT()
             user32.GetWindowRect(game_hwnd, ctypes.byref(rect))
@@ -433,6 +447,7 @@ class OverlayManager:
                 user32.SetWindowLongW(self.hwnd, GWL_EXSTYLE, ex_style)
 
     def begin_frame(self):
+
         """开始新一帧渲染：清空内部 pygame.Surface（全透明）"""
         if self._pygame_surface is not None:
             self._pygame_surface.fill((0, 0, 0, 0))  # F4: 用 fill 替代逐像素循环

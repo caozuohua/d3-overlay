@@ -23,3 +23,57 @@ _probe*.txt
 _boot_out.txt
 check_wintypes.py
 test_window.py
+# D3OA — .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+*.egg-info/
+*.egg
+dist/
+build/
+eggs/
+
+# C 扩展编译产物
+*.obj
+*.o
+*.lib
+*.exp
+*.dll
+
+# PyInstaller
+*.manifest
+!d3oa.manifest  # 保留项目的 manifest 文件
+*.spec
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 日志
+*.log
+logs/
+
+# 用户配置
+~/.d3oa/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# 临时文件
+*.tmp
+*.bak
+*.orig
+
+# OS 文件
+Thumbs.db
+Desktop.ini
+.DS_Store

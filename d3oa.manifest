@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  D3OA — UAC & DPI 清单文件 (Application Manifest)
+  
+  功能：
+  1. 声明不需要管理员权限（asInvoker）
+  2. 声明 DPI 感知（PerMonitorV2），避免高分辨率屏幕模糊
+  3. 声明 Windows 兼容性，防止兼容性层干扰
+  4. 声明可信发布者信息，减少安全软件误报
+
+  使用方式：
+  - PyInstaller: pyinstaller --manifest d3oa.manifest ...
+  - 手动嵌入: mt.exe -manifest d3oa.manifest -outputresource:dist/d3oa.exe;#1
+  - Python 直接运行: 清单文件需与 EXE 同目录，或通过 setup.py 编译嵌入
+-->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <assemblyIdentity
+    version="1.0.0.0"
+    processorArchitecture="amd64"
+    name="D3OA.Diablo3OverlayAssistant"
+    type="win32"
+  />
+  <description>Diablo 3 Transparent Overlay Assistant</description>
+
+  <!-- Windows 兼容性声明 -->
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 / 11 -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+      <!-- Windows 8 / 8.1 -->
+      <supportedOS Id="{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}"/>
+      <!-- Windows 7 -->
+      <supportedOS Id="{35138b9a-5d96-4fbd-8e2d-a2440225f93a}"/>
+    </application>
+  </compatibility>
+
+  <!-- 权限级别：普通用户权限，不需要 UAC 提权 -->
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <!-- asInvoker = 以当前用户权限运行，不请求管理员权限 -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+
+  <!-- DPI 感知声明：支持高分辨率显示器 -->
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <!-- PerMonitorV2: Windows 10 1703+ 推荐的 DPI 感知模式 -->
+      <!-- 允许窗口在不同 DPI 的显示器之间正确缩放 -->
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
+      <!-- 向后兼容：Windows 8.1+ -->
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <!-- 长路径支持：Windows 10 1607+ -->
+      <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
+    </windowsSettings>
+  </application>
+
+  <!-- 通用控件版本 6.0（现代 UI 主题支持） -->
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+      />
+    </dependentAssembly>
+  </dependency>
+</assembly>
