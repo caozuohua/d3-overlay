@@ -23,7 +23,7 @@ class Timer:
         self._elapsed = 0.0
         self._splits = []
 
-    def start(self):
+    def start(self, label: str = ""):
         self._start_time = time.time()
         self._paused = False
         self._paused_at = 0
@@ -150,7 +150,10 @@ class Plugin(PluginBase):
         events = game_data.get('log_events', [])
         for event in events[-5:]:  # 只检查最近5个事件
             event_type = event.get('type')
-            if event_type == 'rift_event' and not self.timer.is_running():
+            if event_type == 'new_game' and not self.timer.is_running():
+                self.timer.start(label="Game")
+                logger.info("检测到新游戏，计时器启动")
+            elif event_type == 'rift_event' and not self.timer.is_running():
                 self.timer.start()
                 logger.info("检测到秘境事件，计时器启动")
             elif event_type == 'leave_game' and self.timer.is_running():
