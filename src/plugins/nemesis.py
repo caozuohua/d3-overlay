@@ -48,8 +48,32 @@ class Plugin(PluginBase):
             raw = event.get('raw', '').lower()
             event_type = event.get('type', '')
 
-            # 从日志中检测复仇怪相关事件
-            if 'nemesis' in raw or 'revenge' in raw:
+            # 结构化事件处理
+            if event_type == 'nemesis':
+                nemesis_state = event.get('nemesis_state')
+                if nemesis_state == 'appeared':
+                    self._nemesis_state = 'appeared'
+                    self._appear_time = time.time()
+                    logger.info("复仇怪出现！")
+                elif nemesis_state == 'defeated':
+                    self._nemesis_state = 'defeated'
+                    self._defeat_time = time.time()
+                    self._kill_count += 1
+                    logger.info(f"复仇怪已击杀！总计: {self._kill_count}")
+                else:
+                    # 旧式日志字符串回退（向后兼容）
+                    if 'appear' in raw or 'spawn' in raw:
+                        self._nemesis_state = 'appeared'
+                        self._appear_time = time.time()
+                        logger.info("复仇怪出现！")
+                    elif 'defeat' in raw or 'kill' in raw or 'die' in raw:
+                        self._nemesis_state = 'defeated'
+                        self._defeat_time = time.time()
+                        self._kill_count += 1
+                        logger.info(f"复仇怪已击杀！总计: {self._kill_count}")
+
+            # 旧式日志字符串回退（向后兼容，针对非 type 化的日志）
+            elif 'nemesis' in raw or 'revenge' in raw:
                 if 'appear' in raw or 'spawn' in raw:
                     self._nemesis_state = 'appeared'
                     self._appear_time = time.time()

@@ -152,6 +152,40 @@ def test_nemesis_plugin_idle_without_nemesis_log():
     assert p._nemesis_state == "idle"
 
 
+def test_rift_info_tracks_progress_and_boss():
+    from plugins.rift_info import Plugin as RiftPlugin
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+    p = RiftPlugin()
+    p.on_init({'config': FakeConfig()})
+    p.on_update(0.0, {'log_events': [
+        {'type': 'rift_event', 'rift_type': 'greater', 'rift_id': 'rift_1'},
+        {'type': 'rift_progress', 'progress': 0.45},
+        {'type': 'rift_progress', 'progress': 1.0},
+    ]})
+    assert p.tracker.active is True
+    assert p.tracker.rift_type == 'greater'
+    assert p.tracker.boss_spawned is True
+    assert p.tracker.get_progress_percent() == 100
+
+
+def test_nemesis_state_changes_with_events():
+    from plugins.nemesis import Plugin as NemesisPlugin
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+    p = NemesisPlugin()
+    p.on_init({'config': FakeConfig(), 'data_provider': None})
+    appeared = {'type': 'nemesis', 'nemesis_state': 'appeared', 'raw': 'Nemesis spawned'}
+    p.on_update(0.016, {'log_events': [appeared]})
+    assert p._nemesis_state == 'appeared'
+    defeated = {'type': 'nemesis', 'nemesis_state': 'defeated', 'raw': 'Nemesis killed'}
+    p.on_update(0.016, {'log_events': [appeared, defeated]})
+    assert p._nemesis_state == 'defeated'
+    assert p._kill_count == 1
+
+
 # ───────────────────────────────────────────────────────
 # 5) 渲染断路复现（核心缺陷 #1）
 #    main 把 overlay.get_surface()（ctypes 像素数组）传给插件，
@@ -177,6 +211,24 @@ def test_plugin_renders_into_real_surface_no_error():
     surf = pygame.Surface((220, 90), pygame.SRCALPHA)
     # 修复后：不抛异常
     p.on_render(surf)
+
+
+def test_timer_auto_controls_on_game_events():
+    """Phase 1 Task 2: Timer 插件应在 new_game 自动启动，leave_game 自动停止。"""
+    from plugins.timer import Plugin as TimerPlugin
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = TimerPlugin()
+    p.on_init({'config': FakeConfig()})
+    # new_game should start timer
+    p.on_update(0.0, {'log_events': [{'type': 'new_game'}]})
+    assert p.timer.is_running() is True, "new_game 事件后计时器应处于运行状态"
+    # leave_game should stop timer
+    p.on_update(0.0, {'log_events': [{'type': 'new_game'}, {'type': 'leave_game'}]})
+    assert p.timer.is_running() is False, "leave_game 事件后计时器应已停止"
 
 
 def test_surface_contract_mismatch():

@@ -109,29 +109,37 @@ class Plugin(PluginBase):
             raw = event.get('raw', '').lower()
             event_type = event.get('type', '')
 
-            # 检测秘境开始
+            # 结构化事件处理
             if event_type == 'rift_event':
-                if 'start' in raw or 'open' in raw or 'enter' in raw:
-                    rift_type = 'greater' if 'greater' in raw else 'nephalem'
-                    self.tracker.start(rift_type)
-                    logger.info(f"秘境开始: {rift_type}")
+                rift_type = event.get('rift_type', 'nephalem')
+                self.tracker.start(rift_type)
+                logger.info(f"秘境开始: {rift_type}")
 
-                # 检测进度更新
-                if 'progress' in raw:
-                    # 尝试从日志中提取百分比
-                    import re
-                    match = re.search(r'(\d+\.?\d*)%', raw)
-                    if match:
-                        pct = float(match.group(1)) / 100.0
-                        self.tracker.update_progress(pct)
-
-                # 检测完成
-                if 'complete' in raw or 'finish' in raw:
-                    self.tracker.stop()
-                    logger.info(f"秘境完成，用时: {self.tracker.format_elapsed()}")
+            elif event_type == 'rift_progress':
+                progress = event.get('progress', 0.0)
+                self.tracker.update_progress(progress)
 
             elif event_type == 'leave_game':
                 self.tracker.active = False
+
+            # 旧式日志字符串回退（向后兼容）
+            else:
+                if 'rift' in raw or 'rift' in event_type:
+                    if 'start' in raw or 'open' in raw or 'enter' in raw:
+                        rift_type = 'greater' if 'greater' in raw else 'nephalem'
+                        self.tracker.start(rift_type)
+                        logger.info(f"秘境开始: {rift_type}")
+
+                    if 'progress' in raw:
+                        import re
+                        match = re.search(r'(\d+\.?\d*)%', raw)
+                        if match:
+                            pct = float(match.group(1)) / 100.0
+                            self.tracker.update_progress(pct)
+
+                    if 'complete' in raw or 'finish' in raw:
+                        self.tracker.stop()
+                        logger.info(f"秘境完成，用时: {self.tracker.format_elapsed()}")
 
     def on_render(self, surface):
         """渲染秘境进度面板"""
