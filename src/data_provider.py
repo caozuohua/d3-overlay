@@ -7,6 +7,7 @@ D3OA — 数据提供器
 
 import json
 import os
+import re
 import time
 import logging
 from pathlib import Path
@@ -294,30 +295,77 @@ class GameLogWatcher:
         return events
 
     def _parse_line(self, line: str) -> Optional[dict]:
-        """解析单行日志"""
+        """解析单行日志（支持 typed event + 向后兼容 raw string）"""
         lower = line.lower()
+        ts = time.time()
 
         # 游戏开始/结束
         if 'game_new' in lower or 'game_newgame' in lower:
-            return {'type': 'new_game', 'raw': line, 'timestamp': time.time()}
+            return {'type': 'new_game', 'raw': line, 'timestamp': ts}
         if 'game_leave' in lower or 'game_destroyed' in lower:
-            return {'type': 'leave_game', 'raw': line, 'timestamp': time.time()}
+            return {'type': 'leave_game', 'raw': line, 'timestamp': ts}
 
-        # 秘境相关
-        if 'nephalemrift' in lower or 'greater_rift' in lower:
-            return {'type': 'rift_event', 'raw': line, 'timestamp': time.time()}
+        # 秘境相关：匹配 nepalemrift / greater_rift 及其宽松变体（空格而不是下划线）
+        rift_match = False
+        rift_type = None
+        if 'nephalemrift' in lower:
+            rift_match = True
+            rift_type = 'nephalemrift'
+        elif 'greater_rift' in lower:
+            rift_match = True
+            rift_type = 'greater_rift'
+        elif 'nephalem rift' in lower or 'greater rift' in lower:
+            rift_match = True
+            rift_type = 'nephalemrift' if 'nephalem rift' in lower else 'greater_rift'
+        elif 'rift' in lower and any(k in lower for k in ('progress', 'opened', 'open', 'start', 'enter')):
+            rift_match = True
+            if 'nephalem' in lower:
+                rift_type = 'nephalemrift'
+            elif 'greater' in lower:
+                rift_type = 'greater_rift'
+            else:
+                rift_type = 'unknown'
+
+        if rift_match:
+            if 'progress' in lower:
+                # rift_progress with float progress
+                m = re.search(r'progress[:\s]+(\d+(?:\.\d+)?)', lower)
+                progress = float(m.group(1)) / 100.0 if m else 0.0
+                return {
+                    'type': 'rift_progress',
+                    'raw': line,
+                    'timestamp': ts,
+                    'rift_type': rift_type,
+                    'progress': progress,
+                }
+            else:
+                # rift_event with rift_type/rift_id
+                m = re.search(r'\bid[:\s_]*([a-z0-9_-]+)', lower)
+                rift_id = m.group(1) if m else None
+                return {
+                    'type': 'rift_event',
+                    'raw': line,
+                    'timestamp': ts,
+                    'rift_type': rift_type,
+                    'rift_id': rift_id,
+                }
 
         # 复仇怪 (Nemesis)
-        if 'nemesis' in lower:
-            return {'type': 'nemesis', 'raw': line, 'timestamp': time.time()}
+        if 'nemesis' in lower or 'revenge' in lower:
+            if 'appear' in lower or 'spawn' in lower:
+                return {'type': 'nemesis', 'raw': line, 'timestamp': ts, 'status': 'appeared'}
+            elif 'defeat' in lower or 'kill' in lower or 'die' in lower:
+                return {'type': 'nemesis', 'raw': line, 'timestamp': ts, 'status': 'defeated'}
+            else:
+                return {'type': 'nemesis', 'raw': line, 'timestamp': ts}
 
         # 传送点
         if 'waypoint' in lower:
-            return {'type': 'waypoint', 'raw': line, 'timestamp': time.time()}
+            return {'type': 'waypoint', 'raw': line, 'timestamp': ts}
 
         # 组队
         if 'party' in lower or 'join' in lower:
-            return {'type': 'party_event', 'raw': line, 'timestamp': time.time()}
+            return {'type': 'party_event', 'raw': line, 'timestamp': ts}
 
         return None
 

@@ -115,6 +115,25 @@ def test_nemesis_plugin_reacts_to_nemesis_event():
     assert p._kill_count == 1
 
 
+def test_logwatcher_parses_typed_rift_and_nemesis_events():
+    """Failing test: log parser should emit typed events for
+    rift_event, rift_progress, nemesis, new_game, leave_game."""
+    w = GameLogWatcher()
+    lines = [
+        "[12:00:00] (Game) Game_NewGame",
+        "[12:00:01] (Game) Game_LeaveGame",
+        "[12:00:02] (Game) Nephalem Rift opened",
+        "[12:00:03] (Game) Rift progress: 50%",
+        "[12:00:04] (Game) Nemesis monster has spawned",
+    ]
+    events = w.parse_events(lines)
+    by_type = {e["type"]: e for e in events}
+    assert "new_game"      in by_type, f"missing new_game, got: {list(by_type)}"
+    assert "leave_game"    in by_type, f"missing leave_game, got: {list(by_type)}"
+    assert "rift_event"    in by_type, f"missing rift_event, got: {list(by_type)}"
+    assert "rift_progress" in by_type, f"missing rift_progress, got: {list(by_type)}"
+    assert "nemesis"       in by_type, f"missing nemesis, got: {list(by_type)}"
+
 def test_nemesis_plugin_idle_without_nemesis_log():
     """F2 修复后：没有复仇怪关键字的日志，插件应保持 idle（不再误触发）。"""
     from plugins.nemesis import Plugin as NemesisPlugin
