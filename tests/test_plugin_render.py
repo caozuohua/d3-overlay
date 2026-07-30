@@ -216,6 +216,27 @@ def test_drop_tracker_renders_placeholder():
     assert surface.get_width() == 260
 
 
+def test_build_assistant_renders_placeholder():
+    """Phase 2 Task 6: BuildAssistant 插件应能渲染占位面板。"""
+    try:
+        import pygame
+    except ImportError:
+        print("  SKIP  test_build_assistant_renders_placeholder (pygame 未安装)")
+        return
+    from plugins.build_assistant import Plugin as BuildAssistantPlugin
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = BuildAssistantPlugin()
+    p.on_init({'config': FakeConfig(), 'data_provider': None})
+    surface = pygame.Surface((260, 160), pygame.SRCALPHA)
+    # Should not raise
+    p.on_render(surface)
+    assert surface.get_width() == 260
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
