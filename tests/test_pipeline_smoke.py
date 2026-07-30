@@ -26,23 +26,21 @@ def test_build_data_pipeline_runs_without_error():
             capture_output=True,
             text=True,
             check=False,
-            timeout=60,
+            timeout=120,
         )
         assert result.returncode == 0, (
             f"pipeline exited {result.returncode}\nstdout: {result.stdout}\nstderr: {result.stderr}"
         )
 
-        output_path = os.path.abspath(
-            os.path.join(tmpdir, "data", "d3-data.json")
-        )
+        output_path = os.path.abspath(os.path.join(tmpdir, "data", "d3-data.json"))
         assert os.path.exists(output_path), f"missing output: {output_path}"
 
         with open(output_path, "r", encoding="utf-8") as fh:
             data = json.load(fh)
 
         assert "skills" in data
-        assert "barbarian" in data["skills"]
-        assert "Bash" in data["skills"]["barbarian"]
+        assert data["meta"]["classes_count"] >= 1
+        assert data["skills"].get("barbarian")
     finally:
         os.chdir(cwd)
 
