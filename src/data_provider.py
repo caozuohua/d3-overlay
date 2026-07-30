@@ -146,6 +146,10 @@ class D3APIClient:
         tag = battle_tag.replace('#', '-')
         return self._request(f"/d3/profile/{tag}/hero/{hero_id}")
 
+    def get_hero_skills(self, class_slug: str) -> Optional[dict]:
+        """获取职业技能数据"""
+        return self._request(f"/d3/data/hero/{class_slug}")
+
     def get_hero_items(self, battle_tag: str, hero_id: int) -> Optional[dict]:
         """获取英雄装备详情"""
         tag = battle_tag.replace('#', '-')
