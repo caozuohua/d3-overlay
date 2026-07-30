@@ -286,8 +286,12 @@ class Plugin(PluginBase):
 
 ## 📚 文档
 
-- [技术文档](docs/TECHNICAL.md) — 架构设计、API 参考、扩展路线图
+- [README](README.md) — 项目介绍、安装、快速开始
+- [技术文档](docs/TECHNICAL.md) — 架构设计、API 参考、扩展指南
 - [用户手册](docs/USER_GUIDE.md) — 安装指南、配置说明、故障排除
+- [贡献指南](CONTRIBUTING.md) — 开发约定、提交规范、测试要求
+- [更新日志](CHANGELOG.md) — 版本变更记录
+- [安全策略](SECURITY.md) — 漏洞报告与安全边界
 
 ---
 
