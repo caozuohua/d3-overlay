@@ -278,6 +278,74 @@ def test_event_bus_process_log_events():
     assert counts.get('rift_progress') == 1
 
 
+# ───────────────────────────────────────────────────────
+# 7) Typed EventBus integration (Phase 3 Task 8)
+# ───────────────────────────────────────────────────────
+def test_plugin_receives_typed_event_via_bus():
+    """Timer 插件应在 game_data 提供 event_bus 时，通过 bus 接收 rift_event / leave_game。"""
+    from plugins.timer import Plugin as TimerPlugin
+    from event_bus import EventBus
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = TimerPlugin()
+    p.on_init({'config': FakeConfig()})
+
+    bus = EventBus()
+    # on_update 应会把插件的方法订阅到 bus 上
+    p.on_update(0.016, {'event_bus': bus})
+
+    # 在 on_update 之后手动 publish，验证回调链路
+    bus.publish('rift_event', {'type': 'rift_event'})
+    assert p.timer.is_running(), "Timer 应通过 EventBus 的 rift_event 启动"
+
+    bus.publish('leave_game', {'type': 'leave_game'})
+    assert not p.timer.is_running(), "Timer 应通过 EventBus 的 leave_game 停止"
+
+
+def test_plugin_backward_compat_without_bus():
+    """无 event_bus 时，Timer 插件应仍通过 log_events 扫描正常运行。"""
+    from plugins.timer import Plugin as TimerPlugin
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = TimerPlugin()
+    p.on_init({'config': FakeConfig()})
+
+    p.on_update(0.016, {'log_events': [{'type': 'new_game'}]})
+    assert p.timer.is_running(), "new_game 事件后计时器应运行"
+
+    p.on_update(0.016, {'log_events': [{'type': 'new_game'}, {'type': 'leave_game'}]})
+    assert not p.timer.is_running(), "leave_game 事件后计时器应停止"
+
+
+def test_nemesis_receives_typed_event_via_bus():
+    """Nemesis 插件应在 game_data 提供 event_bus 时，通过 bus 接收 nemesis 事件。"""
+    from plugins.nemesis import Plugin as NemesisPlugin
+    from event_bus import EventBus
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = NemesisPlugin()
+    p.on_init({'config': FakeConfig(), 'data_provider': None})
+
+    bus = EventBus()
+    p.on_update(0.016, {'event_bus': bus})
+
+    bus.publish('nemesis', {'type': 'nemesis', 'nemesis_state': 'appeared'})
+    assert p._nemesis_state == 'appeared'
+
+    bus.publish('nemesis', {'type': 'nemesis', 'nemesis_state': 'defeated'})
+    assert p._nemesis_state == 'defeated'
+    assert p._kill_count == 1
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

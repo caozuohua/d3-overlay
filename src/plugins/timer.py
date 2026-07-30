@@ -140,12 +140,20 @@ class Plugin(PluginBase):
         self.record_mgr = RecordManager(self.config)
         self._enabled = True
         self._auto_detect = True
+        self._bus_instance = None
         logger.info("Timer 插件初始化完成")
 
     def on_update(self, delta_time: float, game_data: dict):
         """根据游戏事件自动启停计时器"""
         if not self._auto_detect:
             return
+
+        # Typed EventBus wiring (Phase 3 Task 8)
+        event_bus = game_data.get('event_bus')
+        if event_bus is not None and getattr(self, '_bus_instance', None) is not event_bus:
+            event_bus.subscribe('rift_event', self.on_rift_event)
+            event_bus.subscribe('leave_game', self.on_leave_game)
+            self._bus_instance = event_bus
 
         events = game_data.get('log_events', [])
         for event in events[-5:]:  # 只检查最近5个事件
@@ -161,6 +169,20 @@ class Plugin(PluginBase):
                 self.timer.stop()
                 self.record_mgr.save_record(elapsed, self.timer._splits.copy())
                 logger.info(f"游戏离开，计时器停止: {elapsed:.2f}s")
+
+    def on_rift_event(self, event: dict):
+        """EventBus 回调：秘境事件"""
+        if not self.timer.is_running():
+            self.timer.start()
+            logger.info("检测到秘境事件（via EventBus），计时器启动")
+
+    def on_leave_game(self, event: dict):
+        """EventBus 回调：离开游戏"""
+        if self.timer.is_running():
+            elapsed = self.timer.get_elapsed()
+            self.timer.stop()
+            self.record_mgr.save_record(elapsed, self.timer._splits.copy())
+            logger.info(f"游戏离开（via EventBus），计时器停止: {elapsed:.2f}s")
 
     def on_render(self, surface):
         """渲染计时器面板"""
