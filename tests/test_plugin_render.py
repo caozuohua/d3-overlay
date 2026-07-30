@@ -237,6 +237,31 @@ def test_build_assistant_renders_placeholder():
     assert surface.get_width() == 260
 
 
+def test_build_assistant_renders_loaded_data():
+    """BuildAssistant 插件应从 data/d3-data.json 读取并渲染内容。"""
+    try:
+        import pygame
+    except ImportError:
+        print("  SKIP  test_build_assistant_renders_loaded_data (pygame 未安装)")
+        return
+    from plugins.build_assistant import Plugin as BuildAssistantPlugin
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            if path == 'plugins.build_assistant.position':
+                return [20, 660]
+            return default
+
+    p = BuildAssistantPlugin()
+    p.on_init({'config': FakeConfig(), 'data_provider': None})
+    assert p._data_loaded is True
+    assert p._classes
+    surface = pygame.Surface((300, 180), pygame.SRCALPHA)
+    p.on_render(surface)
+    assert surface.get_width() == 300
+    assert surface.get_height() == 180
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
