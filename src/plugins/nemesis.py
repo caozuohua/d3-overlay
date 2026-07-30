@@ -112,8 +112,8 @@ class Plugin(PluginBase):
             pygame.draw.line(surface, dash, (x + panel_w - 1, y + i), (x + panel_w - 1, y + i + 4))
 
         try:
-            font_title = pygame.font.SysFont("Microsoft YaHei", 12, bold=True)
-            font_text = pygame.font.SysFont("Microsoft YaHei", 11)
+            font_title = pygame.font.Font(None, 12)
+            font_text = pygame.font.Font(None, 11)
 
             # 标题
             title = font_title.render("👹 复仇怪追踪", True, (255, 165, 0))

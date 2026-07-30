@@ -192,9 +192,9 @@ class Plugin(PluginBase):
         # 标题
         try:
             if self.overlay and hasattr(self.overlay, 'get_font'):
-                font_title = self.overlay.get_font("Microsoft YaHei", 12)
-                font_time = self.overlay.get_font("Consolas", 24)
-                font_small = self.overlay.get_font("Microsoft YaHei", 11)
+                font_title = self.overlay.get_font(None, 12)
+                font_time = self.overlay.get_font(None, 24)
+                font_small = self.overlay.get_font(None, 11)
             else:
                 font_title = pygame.font.Font(None, 12)
                 font_time = pygame.font.Font(None, 24)

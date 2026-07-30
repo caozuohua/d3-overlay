@@ -62,7 +62,7 @@ class Plugin(PluginBase):
             pygame.draw.line(surface, dash_color, (x + panel_w - 1, y + i), (x + panel_w - 1, y + i + 4))
 
         try:
-            font = pygame.font.SysFont("Microsoft YaHei", 14, bold=True)
+            font = pygame.font.Font(None, 14)
         except Exception:
             font = pygame.font.Font(None, 16)
 
