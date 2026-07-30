@@ -93,30 +93,58 @@ D3OA 是一款基于 **透明窗口叠加技术** 的 Diablo 3 游戏辅助工�
 
 ```
 d3-overlay/
-├── README.md                    # 项目文档
+├── README.md                    # 项目介绍
 ├── LICENSE                      # MIT 许可证
+├── CHANGELOG.md                 # 版本变更记录
+├── CONTRIBUTING.md              # 贡献指南
+├── SECURITY.md                  # 安全策略
+├── pyproject.toml               # 打包与运行配置
 ├── requirements.txt             # Python 依赖
 ├── config/
 │   └── default.json             # 默认配置
+├── data/
+│   └── d3-data.json             # BuildAssistant 离线数据
 ├── docs/
 │   ├── TECHNICAL.md             # 技术文档 — 架构、API、扩展指南
-│   └── USER_GUIDE.md            # 用户手册 — 安装、配置、故障排除
-└── src/
-    ├── main.py                  # 主入口 + 主循环
-    ├── overlay.py               # 透明叠加窗口管理 (Win32 ctypes)
-    ├── overlay_core.c           # C 扩展 — 高性能 Win32 窗口操作
-    ├── game_monitor.py          # D3 进程监控
-    ├── data_provider.py         # 数据聚合 (API + 日志 + 缓存)
-    ├── renderer.py              # 渲染引擎 (Pygame ARGB)
-    ├── plugin_manager.py        # 插件系统
-    ├── config.py                # 配置管理
-    ├── hotkey.py                # 全局热键
-    ├── setup.py                 # C 扩展编译脚本
-    └── plugins/
-        ├── timer.py             # ⏱ 秘境计时器
-        ├── build_info.py        # 📋 构筑信息展示
-        ├── nemesis.py           # 👹 复仇怪追踪
-        └── rift_info.py         # 📊 秘境进度信息
+│   ├── USER_GUIDE.md            # 用户手册 — 安装、配置、故障排除
+│   ├── CODE_REVIEW.md           # 代码审查结论
+│   └── ARCHITECTURE.md          # 架构演进记录
+├── scripts/
+│   └── build_data_pipeline.py   # BuildAssistant 数据管线生成器
+├── src/
+│   ├── main.py                  # 主入口 + 主循环
+│   ├── overlay.py               # 透明叠加窗口管理 (Win32 ctypes)
+│   ├── plugin_manager.py        # 插件系统
+│   ├── config.py                # 配置管理，支持 reload/watch
+│   ├── hotkey.py                # 全局热键
+│   ├── game_monitor.py          # D3 进程监控
+│   ├── data_provider.py         # 数据聚合
+│   ├── event_bus.py             # Typed EventBus
+│   ├── build_assistant_data.py  # d3planner JS 离线解析器
+│   ├── build_assistant_scraper.py # IcyVeins 练级指南抓取器
+│   └── plugins/
+│       ├── timer.py             # ⏱ 秘境计时器
+│       ├── build_info.py        # 📋 构筑信息展示
+│       ├── nemesis.py           # 👹 复仇怪追踪
+│       ├── rift_info.py         # 📊 秘境进度信息
+│       ├── boss_alert.py        # 🚨 Boss 预警
+│       ├── build_assistant.py   # 🧭 练级/技能推荐助手
+│       ├── run_stats.py         # 📈 运行统计
+│       ├── drop_tracker.py      # 🎁 掉落追踪
+│       └── skill_cooldown.py    # ⏳ 技能冷却
+└── tests/
+    ├── test_core.py
+    ├── test_plugin_render.py
+    ├── test_layout.py
+    ├── test_hotkey_dispatch.py
+    ├── test_thread_cleanup.py
+    ├── test_config_reload.py
+    ├── test_api_skills.py
+    ├── test_api_auth.py
+    ├── test_build_assistant_data.py
+    ├── test_build_assistant_scraper.py
+    ├── test_pipeline_smoke.py
+    └── test_sno_parser.py
 ```
 
 ---
@@ -286,8 +314,12 @@ class Plugin(PluginBase):
 
 ## 📚 文档
 
-- [技术文档](docs/TECHNICAL.md) — 架构设计、API 参考、扩展路线图
+- [README](README.md) — 项目介绍、安装、快速开始
+- [技术文档](docs/TECHNICAL.md) — 架构设计、API 参考、扩展指南
 - [用户手册](docs/USER_GUIDE.md) — 安装指南、配置说明、故障排除
+- [贡献指南](CONTRIBUTING.md) — 开发约定、提交规范、测试要求
+- [更新日志](CHANGELOG.md) — 版本变更记录
+- [安全策略](SECURITY.md) — 漏洞报告与安全边界
 
 ---
 

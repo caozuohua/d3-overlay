@@ -115,6 +115,25 @@ def test_nemesis_plugin_reacts_to_nemesis_event():
     assert p._kill_count == 1
 
 
+def test_logwatcher_parses_typed_rift_and_nemesis_events():
+    """Failing test: log parser should emit typed events for
+    rift_event, rift_progress, nemesis, new_game, leave_game."""
+    w = GameLogWatcher()
+    lines = [
+        "[12:00:00] (Game) Game_NewGame",
+        "[12:00:01] (Game) Game_LeaveGame",
+        "[12:00:02] (Game) Nephalem Rift opened",
+        "[12:00:03] (Game) Rift progress: 50%",
+        "[12:00:04] (Game) Nemesis monster has spawned",
+    ]
+    events = w.parse_events(lines)
+    by_type = {e["type"]: e for e in events}
+    assert "new_game"      in by_type, f"missing new_game, got: {list(by_type)}"
+    assert "leave_game"    in by_type, f"missing leave_game, got: {list(by_type)}"
+    assert "rift_event"    in by_type, f"missing rift_event, got: {list(by_type)}"
+    assert "rift_progress" in by_type, f"missing rift_progress, got: {list(by_type)}"
+    assert "nemesis"       in by_type, f"missing nemesis, got: {list(by_type)}"
+
 def test_nemesis_plugin_idle_without_nemesis_log():
     """F2 修复后：没有复仇怪关键字的日志，插件应保持 idle（不再误触发）。"""
     from plugins.nemesis import Plugin as NemesisPlugin
@@ -131,6 +150,40 @@ def test_nemesis_plugin_idle_without_nemesis_log():
     events = w.parse_events(["[12:00:01] (Game) You entered the Vault", "[12:00:02] (Game) Game_NewGame"])
     p.on_update(0.016, {"log_events": events})
     assert p._nemesis_state == "idle"
+
+
+def test_rift_info_tracks_progress_and_boss():
+    from plugins.rift_info import Plugin as RiftPlugin
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+    p = RiftPlugin()
+    p.on_init({'config': FakeConfig()})
+    p.on_update(0.0, {'log_events': [
+        {'type': 'rift_event', 'rift_type': 'greater', 'rift_id': 'rift_1'},
+        {'type': 'rift_progress', 'progress': 0.45},
+        {'type': 'rift_progress', 'progress': 1.0},
+    ]})
+    assert p.tracker.active is True
+    assert p.tracker.rift_type == 'greater'
+    assert p.tracker.boss_spawned is True
+    assert p.tracker.get_progress_percent() == 100
+
+
+def test_nemesis_state_changes_with_events():
+    from plugins.nemesis import Plugin as NemesisPlugin
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+    p = NemesisPlugin()
+    p.on_init({'config': FakeConfig(), 'data_provider': None})
+    appeared = {'type': 'nemesis', 'nemesis_state': 'appeared', 'raw': 'Nemesis spawned'}
+    p.on_update(0.016, {'log_events': [appeared]})
+    assert p._nemesis_state == 'appeared'
+    defeated = {'type': 'nemesis', 'nemesis_state': 'defeated', 'raw': 'Nemesis killed'}
+    p.on_update(0.016, {'log_events': [appeared, defeated]})
+    assert p._nemesis_state == 'defeated'
+    assert p._kill_count == 1
 
 
 # ───────────────────────────────────────────────────────
@@ -160,6 +213,24 @@ def test_plugin_renders_into_real_surface_no_error():
     p.on_render(surf)
 
 
+def test_timer_auto_controls_on_game_events():
+    """Phase 1 Task 2: Timer 插件应在 new_game 自动启动，leave_game 自动停止。"""
+    from plugins.timer import Plugin as TimerPlugin
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = TimerPlugin()
+    p.on_init({'config': FakeConfig()})
+    # new_game should start timer
+    p.on_update(0.0, {'log_events': [{'type': 'new_game'}]})
+    assert p.timer.is_running() is True, "new_game 事件后计时器应处于运行状态"
+    # leave_game should stop timer
+    p.on_update(0.0, {'log_events': [{'type': 'new_game'}, {'type': 'leave_game'}]})
+    assert p.timer.is_running() is False, "leave_game 事件后计时器应已停止"
+
+
 def test_surface_contract_mismatch():
     import inspect
     import plugins.timer as timer_mod
@@ -171,6 +242,108 @@ def test_surface_contract_mismatch():
     # 印证插件 on_render 内部确实会尝试 .blit（所以 get_surface 必须返回 Surface）
     src = inspect.getsource(timer_mod.Plugin.on_render)
     assert "blit" in src, "插件本应调用 surface.blit()"
+
+
+# ───────────────────────────────────────────────────────
+# 6) Typed EventBus（Phase 3 Task 8）
+# ───────────────────────────────────────────────────────
+def test_event_bus_publish_and_listen():
+    from event_bus import EventBus
+    bus = EventBus()
+    received = []
+    bus.subscribe('rift_event', lambda e: received.append(('rift', e)))
+    bus.subscribe('nemesis', lambda e: received.append(('nemesis', e)))
+    bus.publish('rift_event', {'type': 'rift_event', 'rift_id': 'r1'})
+    bus.publish('nemesis', {'type': 'nemesis', 'nemesis_state': 'appeared'})
+    assert len(received) == 2
+    assert received[0][0] == 'rift'
+    assert received[1][0] == 'nemesis'
+
+
+def test_event_bus_process_log_events():
+    from event_bus import EventBus
+    bus = EventBus()
+    counts = {}
+    def count(e):
+        counts[e.get('type')] = counts.get(e.get('type'), 0) + 1
+    bus.subscribe('rift_event', count)
+    bus.subscribe('rift_progress', count)
+    events = [
+        {'type': 'rift_event', 'rift_id': 'r1'},
+        {'type': 'rift_progress', 'progress': 0.5},
+        {'type': 'rift_event', 'rift_id': 'r1'},  # duplicate type ignored
+    ]
+    bus.process_log_events(events)
+    assert counts.get('rift_event') == 1
+    assert counts.get('rift_progress') == 1
+
+
+# ───────────────────────────────────────────────────────
+# 7) Typed EventBus integration (Phase 3 Task 8)
+# ───────────────────────────────────────────────────────
+def test_plugin_receives_typed_event_via_bus():
+    """Timer 插件应在 game_data 提供 event_bus 时，通过 bus 接收 rift_event / leave_game。"""
+    from plugins.timer import Plugin as TimerPlugin
+    from event_bus import EventBus
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = TimerPlugin()
+    p.on_init({'config': FakeConfig()})
+
+    bus = EventBus()
+    # on_update 应会把插件的方法订阅到 bus 上
+    p.on_update(0.016, {'event_bus': bus})
+
+    # 在 on_update 之后手动 publish，验证回调链路
+    bus.publish('rift_event', {'type': 'rift_event'})
+    assert p.timer.is_running(), "Timer 应通过 EventBus 的 rift_event 启动"
+
+    bus.publish('leave_game', {'type': 'leave_game'})
+    assert not p.timer.is_running(), "Timer 应通过 EventBus 的 leave_game 停止"
+
+
+def test_plugin_backward_compat_without_bus():
+    """无 event_bus 时，Timer 插件应仍通过 log_events 扫描正常运行。"""
+    from plugins.timer import Plugin as TimerPlugin
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = TimerPlugin()
+    p.on_init({'config': FakeConfig()})
+
+    p.on_update(0.016, {'log_events': [{'type': 'new_game'}]})
+    assert p.timer.is_running(), "new_game 事件后计时器应运行"
+
+    p.on_update(0.016, {'log_events': [{'type': 'new_game'}, {'type': 'leave_game'}]})
+    assert not p.timer.is_running(), "leave_game 事件后计时器应停止"
+
+
+def test_nemesis_receives_typed_event_via_bus():
+    """Nemesis 插件应在 game_data 提供 event_bus 时，通过 bus 接收 nemesis 事件。"""
+    from plugins.nemesis import Plugin as NemesisPlugin
+    from event_bus import EventBus
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = NemesisPlugin()
+    p.on_init({'config': FakeConfig(), 'data_provider': None})
+
+    bus = EventBus()
+    p.on_update(0.016, {'event_bus': bus})
+
+    bus.publish('nemesis', {'type': 'nemesis', 'nemesis_state': 'appeared'})
+    assert p._nemesis_state == 'appeared'
+
+    bus.publish('nemesis', {'type': 'nemesis', 'nemesis_state': 'defeated'})
+    assert p._nemesis_state == 'defeated'
+    assert p._kill_count == 1
 
 
 if __name__ == "__main__":

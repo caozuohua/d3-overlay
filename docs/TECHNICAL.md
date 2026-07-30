@@ -307,50 +307,22 @@ def capture_game_window(hwnd=None):
 ### 4.1 插件接口
 
 ```python
-from abc import ABC, abstractmethod
+from plugin_manager import PluginBase
 
-class PluginBase(ABC):
-    """插件基类 — 所有插件必须继承此类"""
-
+class PluginBase:
     @property
     @abstractmethod
-    def name(self) -> str:
-        """插件名称"""
-        ...
-
+    def name(self) -> str: ...
     @property
     @abstractmethod
-    def version(self) -> str:
-        """插件版本"""
-        ...
-
+    def version(self) -> str: ...
     @property
-    def description(self) -> str:
-        """插件描述"""
-        return ""
-
-    @abstractmethod
-    def on_init(self, context: dict):
-        """初始化回调，context 包含 overlay、config、api 等"""
-        ...
-
-    @abstractmethod
-    def on_update(self, delta_time: float, game_data: dict):
-        """每帧更新回调"""
-        ...
-
-    @abstractmethod
-    def on_render(self, surface):
-        """渲染回调，在叠加层上绘制内容"""
-        ...
-
-    def on_destroy(self):
-        """清理回调"""
-        pass
-
-    def on_config_changed(self, config: dict):
-        """配置变更回调"""
-        pass
+    def description(self) -> str: ...
+    def on_init(self, context: dict): ...
+    def on_update(self, delta_time: float, game_data: dict): ...
+    def on_render(self, surface): ...
+    def on_destroy(self): ...
+    def on_config_changed(self, config: dict): ...
 ```
 
 ### 4.2 插件注册与加载

@@ -74,6 +74,7 @@ class PluginManager:
             plugin_dir = os.path.join(os.path.dirname(__file__), 'plugins')
         self.plugin_dir = plugin_dir
         self.plugins: dict[str, PluginBase] = {}
+        self._plugin_fail_counter: dict[str, int] = {}
 
     def discover_and_load(self, context: dict):
         """自动发现并加载所有插件"""
@@ -124,21 +125,56 @@ class PluginManager:
 
     def update_all(self, delta_time: float, game_data: dict):
         """更新所有启用的插件"""
+        fail_counts: dict[str, int] = {}
         for plugin in self.plugins.values():
             if plugin.enabled:
                 try:
                     plugin.on_update(delta_time, game_data)
                 except Exception as e:
+                    fail_counts[plugin.name] = fail_counts.get(plugin.name, 0) + 1
                     logger.error(f"插件 {plugin.name} 更新失败: {e}")
+
+        for name, count in fail_counts.items():
+            self._plugin_fail_counter[name] = self._plugin_fail_counter.get(name, 0) + count
+
+        for name in list(self._plugin_fail_counter.keys()):
+            if self._plugin_fail_counter.get(name, 0) >= 2:
+                plugin = self.plugins.get(name)
+                if plugin:
+                    plugin.enabled = False
+                    logger.warning(f"连续崩溃，自动禁用 {name}")
+                    self._plugin_fail_counter.pop(name, None)
+
+        # 仍启用的插件本次未被禁用，重置计数让其有机会恢复
+        for name in list(self._plugin_fail_counter.keys()):
+            if name in self.plugins and self.plugins[name].enabled:
+                self._plugin_fail_counter.pop(name, None)
 
     def render_all(self, surface):
         """渲染所有启用的插件"""
+        fail_counts: dict[str, int] = {}
         for plugin in self.plugins.values():
             if plugin.enabled:
                 try:
                     plugin.on_render(surface)
                 except Exception as e:
+                    fail_counts[plugin.name] = fail_counts.get(plugin.name, 0) + 1
                     logger.error(f"插件 {plugin.name} 渲染失败: {e}")
+
+        for name, count in fail_counts.items():
+            self._plugin_fail_counter[name] = self._plugin_fail_counter.get(name, 0) + count
+
+        for name in list(self._plugin_fail_counter.keys()):
+            if self._plugin_fail_counter.get(name, 0) >= 2:
+                plugin = self.plugins.get(name)
+                if plugin:
+                    plugin.enabled = False
+                    logger.warning(f"连续崩溃，自动禁用 {name}")
+                    self._plugin_fail_counter.pop(name, None)
+
+        for name in list(self._plugin_fail_counter.keys()):
+            if name in self.plugins and self.plugins[name].enabled:
+                self._plugin_fail_counter.pop(name, None)
 
     def destroy_all(self):
         """销毁所有插件"""
@@ -148,6 +184,7 @@ class PluginManager:
             except Exception as e:
                 logger.error(f"插件 {plugin.name} 销毁失败: {e}")
         self.plugins.clear()
+        self._plugin_fail_counter.clear()
 
     def get_plugin(self, name: str) -> PluginBase:
         """获取指定插件"""

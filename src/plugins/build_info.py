@@ -50,6 +50,7 @@ class Plugin(PluginBase):
 
     def on_init(self, context: dict):
         self.config = context['config']
+        self.overlay = context.get('overlay')
         self.data_provider = context.get('data_provider')
         self._profile_data = None
         self._hero_data = None
@@ -120,13 +121,19 @@ class Plugin(PluginBase):
             pygame.draw.line(surface, (100, 180, 255, 230), (x + panel_w - 1, y + i), (x + panel_w - 1, y + i + 4))
 
         try:
-            font_title = pygame.font.SysFont("Microsoft YaHei", 12, bold=True)
-            font_text = pygame.font.SysFont("Microsoft YaHei", 11)
-            font_skill = pygame.font.SysFont("Microsoft YaHei", 10)
+            font_title = pygame.font.Font(None, 12)
+            font_text = pygame.font.Font(None, 11)
+            font_skill = pygame.font.Font(None, 10)
 
             # 标题
             title = font_title.render("📋 构筑信息", True, (255, 165, 0))
             surface.blit(title, (x + 8, y + 6))
+
+            battle_tag = self.config.get('data.battle_tag', '')
+            if not battle_tag:
+                placeholder = font_text.render("本地数据模式 / 等待日志事件", True, (150, 150, 150))
+                surface.blit(placeholder, (x + 8, y + 30))
+                return
 
             if self._error_msg:
                 err = font_text.render(self._error_msg, True, (200, 100, 100))
@@ -181,3 +188,5 @@ class Plugin(PluginBase):
 
         except Exception as e:
             logger.error(f"BuildInfo 渲染失败: {e}")
+        if self.overlay and hasattr(self.overlay, 'register_panel_rect'):
+            self.overlay.register_panel_rect(self.name, pygame.Rect(x, y, panel_w, panel_h))

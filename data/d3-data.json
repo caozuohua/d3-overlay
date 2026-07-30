@@ -1,0 +1,28 @@
+{
+  "meta": {
+    "source": "d3planner-sample + scraper-smoke",
+    "classes_count": 2,
+    "scraper_rows_count": 1
+  },
+  "skills": {
+    "barbarian": {
+      "Bash": {
+        "name": "Bash"
+      },
+      "Frenzy": {
+        "name": "Frenzy"
+      }
+    },
+    "wizard": {
+      "MagicMissile": {
+        "name": "Magic Missile"
+      }
+    }
+  },
+  "leveling_guide_samples": [
+    {
+      "name": "Whirlwind",
+      "level": "12"
+    }
+  ]
+}

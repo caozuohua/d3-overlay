@@ -31,7 +31,8 @@
     },
     "build_info": {
       "enabled": true,
-      "position": [20, 120]
+      "position": [20, 120],
+      "require_api": false
     },
     "nemesis": {
       "enabled": true,

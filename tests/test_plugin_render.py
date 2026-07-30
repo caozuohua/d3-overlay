@@ -12,7 +12,6 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-
 def test_plugin_gets_overlay_injected():
     """F8: PluginManager 应在加载后注入 plugin.overlay（避免 AttributeError）。"""
     from plugin_manager import PluginManager
@@ -65,6 +64,202 @@ def test_plugin_render_does_not_raise_on_real_surface():
         except Exception as e:
             # 其它渲染细节错误（如缺数据）允许，但 'font not initialized' 不允许
             assert "font not initialized" not in str(e), f"{p.name} 字体未初始化: {e}"
+
+
+def test_build_info_without_credentials_shows_local_mode():
+    import pygame
+    from plugins.build_info import Plugin as BuildPlugin
+    class FakeConfig:
+        def get(self, path, default=None):
+            if path == 'data.battle_tag':
+                return ''
+            if path == 'data.access_token':
+                return ''
+            if path == 'data.client_id':
+                return ''
+            if path == 'data.client_secret':
+                return ''
+            return default
+    p = BuildPlugin()
+    p.on_init({'config': FakeConfig(), 'data_provider': None})
+    surface = pygame.Surface((260, 160), pygame.SRCALPHA)
+    # Should not raise
+    p.on_render(surface)
+    assert surface.get_width() == 260
+
+
+def test_boss_alert_triggers_on_rift_complete():
+    from plugins.boss_alert import Plugin as BossAlertPlugin
+    import pygame
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = BossAlertPlugin()
+    p.on_init({'config': FakeConfig(), 'overlay': None, 'data_provider': None})
+    assert not p._boss_active
+    assert not p._game_active
+
+    p.on_update(0.016, {
+        'log_events': [
+            {'type': 'rift_event', 'raw': 'Enter Greater Rift', 'rift_type': 'greater'},
+        ]
+    })
+    assert p._game_active
+    assert not p._boss_active
+
+    p.on_update(0.016, {
+        'log_events': [
+            {'type': 'rift_event', 'raw': 'Enter Greater Rift', 'rift_type': 'greater'},
+            {'type': 'rift_progress', 'progress': 1.0},
+        ]
+    })
+    assert p._boss_active
+    assert p._boss_timestamp is not None
+
+    surface = pygame.Surface((400, 600), pygame.SRCALPHA)
+    p.on_render(surface)
+    assert surface.get_width() == 400
+    assert surface.get_height() == 600
+
+
+def test_boss_alert_resets_on_leave_game():
+    from plugins.boss_alert import Plugin as BossAlertPlugin
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = BossAlertPlugin()
+    p.on_init({'config': FakeConfig(), 'overlay': None, 'data_provider': None})
+    p.on_update(0.016, {
+        'log_events': [
+            {'type': 'rift_event', 'raw': 'Enter Rift', 'rift_type': 'nephalem'},
+            {'type': 'rift_progress', 'progress': 1.0},
+        ]
+    })
+    assert p._boss_active
+    assert p._game_active
+
+    p.on_update(0.016, {
+        'log_events': [
+            {'type': 'rift_event', 'raw': 'Enter Rift', 'rift_type': 'nephalem'},
+            {'type': 'rift_progress', 'progress': 1.0},
+            {'type': 'leave_game', 'raw': 'Leave Game'},
+        ]
+    })
+    assert not p._boss_active
+    assert not p._game_active
+
+
+def test_skill_cooldown_renders_placeholder():
+    """Phase 4 Task 11: SkillCooldown 插件应能渲染占位面板。"""
+    try:
+        import pygame
+    except ImportError:
+        print("  SKIP  test_skill_cooldown_renders_placeholder (pygame 未安装)")
+        return
+    from plugins.skill_cooldown import Plugin as SkillCooldownPlugin
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = SkillCooldownPlugin()
+    p.on_init({'config': FakeConfig(), 'data_provider': None})
+    surface = pygame.Surface((260, 160), pygame.SRCALPHA)
+    # Should not raise
+    p.on_render(surface)
+    assert surface.get_width() == 260
+
+
+def test_run_stats_renders_placeholder():
+    """Phase 4 Task 11: RunStats 插件应能渲染占位面板。"""
+    try:
+        import pygame
+    except ImportError:
+        print("  SKIP  test_run_stats_renders_placeholder (pygame 未安装)")
+        return
+    from plugins.run_stats import Plugin as RunStatsPlugin
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = RunStatsPlugin()
+    p.on_init({'config': FakeConfig(), 'data_provider': None})
+    surface = pygame.Surface((260, 160), pygame.SRCALPHA)
+    # Should not raise
+    p.on_render(surface)
+    assert surface.get_width() == 260
+
+
+def test_drop_tracker_renders_placeholder():
+    """Phase 4 Task 11: DropTracker 插件应能渲染占位面板。"""
+    try:
+        import pygame
+    except ImportError:
+        print("  SKIP  test_drop_tracker_renders_placeholder (pygame 未安装)")
+        return
+    from plugins.drop_tracker import Plugin as DropTrackerPlugin
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = DropTrackerPlugin()
+    p.on_init({'config': FakeConfig(), 'data_provider': None})
+    surface = pygame.Surface((260, 160), pygame.SRCALPHA)
+    # Should not raise
+    p.on_render(surface)
+    assert surface.get_width() == 260
+
+
+def test_build_assistant_renders_placeholder():
+    """Phase 2 Task 6: BuildAssistant 插件应能渲染占位面板。"""
+    try:
+        import pygame
+    except ImportError:
+        print("  SKIP  test_build_assistant_renders_placeholder (pygame 未安装)")
+        return
+    from plugins.build_assistant import Plugin as BuildAssistantPlugin
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            return default
+
+    p = BuildAssistantPlugin()
+    p.on_init({'config': FakeConfig(), 'data_provider': None})
+    surface = pygame.Surface((260, 160), pygame.SRCALPHA)
+    # Should not raise
+    p.on_render(surface)
+    assert surface.get_width() == 260
+
+
+def test_build_assistant_renders_loaded_data():
+    """BuildAssistant 插件应从 data/d3-data.json 读取并渲染内容。"""
+    try:
+        import pygame
+    except ImportError:
+        print("  SKIP  test_build_assistant_renders_loaded_data (pygame 未安装)")
+        return
+    from plugins.build_assistant import Plugin as BuildAssistantPlugin
+
+    class FakeConfig:
+        def get(self, path, default=None):
+            if path == 'plugins.build_assistant.position':
+                return [20, 660]
+            return default
+
+    p = BuildAssistantPlugin()
+    p.on_init({'config': FakeConfig(), 'data_provider': None})
+    assert p._data_loaded is True
+    assert p._classes
+    surface = pygame.Surface((300, 180), pygame.SRCALPHA)
+    p.on_render(surface)
+    assert surface.get_width() == 300
+    assert surface.get_height() == 180
 
 
 if __name__ == "__main__":

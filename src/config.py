@@ -86,7 +86,7 @@ class Config:
 
     def load(self):
         """加载配置文件
-        
+
         安全处理：
         - 主配置损坏时自动尝试加载 .bak 备份
         - 加载失败时使用默认配置
@@ -118,6 +118,61 @@ class Config:
             # 创建默认配置文件
             self.save()
             logger.info(f"已创建默认配置: {self._config_path}")
+
+    def reload(self):
+        """从磁盘重新加载配置
+
+        安全处理：
+        - 仅在已知配置文件路径时重载
+        - 无路径时静默返回，不抛异常
+        """
+        if not self._config_path:
+            return
+        self.load()
+
+    def _get_mtime(self) -> Optional[float]:
+        """获取配置文件 mtime，不存在返回 None"""
+        if self._config_path and os.path.exists(self._config_path):
+            return os.path.getmtime(self._config_path)
+        return None
+
+    def watch(self, callback, interval: float = 1.0):
+        """启动配置监听（基本轮询实现）
+
+        Args:
+            callback: 配置变更后回调，签名为 ``callback(config: Config)``
+            interval: 轮询间隔（秒）
+        """
+        import threading
+
+        self._watch_stop = threading.Event()
+        self._watch_callback = callback
+        self._watch_interval = interval
+        self._watch_mtime = self._get_mtime()
+
+        def _poll():
+            while not self._watch_stop.is_set():
+                try:
+                    mtime = self._get_mtime()
+                    if mtime is not None and mtime != self._watch_mtime:
+                        self._watch_mtime = mtime
+                        self.reload()
+                        if self._watch_callback:
+                            try:
+                                self._watch_callback(self)
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+                self._watch_stop.wait(self._watch_interval)
+
+        self._watch_thread = threading.Thread(target=_poll, daemon=True)
+        self._watch_thread.start()
+
+    def stop_watch(self):
+        """停止配置监听"""
+        if hasattr(self, "_watch_stop"):
+            self._watch_stop.set()
 
     def _try_load_file(self, path: str) -> Optional[dict]:
         """尝试加载 JSON 配置文件，失败返回 None"""
