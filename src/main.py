@@ -85,6 +85,7 @@ from data_provider import DataProvider
 from plugin_manager import PluginManager
 from hotkey import HotkeyManager
 from click_simulator import ClickSimulator
+from event_bus import EventBus
 
 # ─── 日志配置 ───────────────────────────────────────────
 
