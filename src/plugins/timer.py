@@ -243,6 +243,9 @@ class Plugin(PluginBase):
                 best_str = f"最佳: {self.timer.format_time(best)}"
                 best_surf = font_small.render(best_str, True, (255, 215, 0))
                 surface.blit(best_surf, (x + 8, y + 74))
+            else:
+                hint = font_small.render("等待计时数据...", True, (160, 160, 160))
+                surface.blit(hint, (x + 8, y + 74))
 
         except Exception as e:
             logger.error(f"Timer 渲染失败: {e}")

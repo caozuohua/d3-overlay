@@ -71,6 +71,8 @@ class Plugin(PluginBase):
             font = pygame.font.Font(None, 16)
 
         text = f"DropTracker: {len(self._drops)} items"
+        if not self._drops:
+            text = "DropTracker: 等待掉落数据..."
         text_surf = font.render(text, True, (255, 200, 255))
         text_x = x + (panel_w - text_surf.get_width()) // 2
         text_y = y + (panel_h - text_surf.get_height()) // 2

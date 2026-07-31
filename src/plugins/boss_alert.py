@@ -107,7 +107,7 @@ class Plugin(PluginBase):
             text = "Boss 未出现"
             color = (200, 200, 200)
         else:
-            text = "未在秘境中"
+            text = "未在游戏/秘境中"
             color = (150, 150, 150)
 
         text_surf = font.render(text, True, color)

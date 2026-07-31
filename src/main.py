@@ -137,6 +137,7 @@ class D3OverlayApp:
         # 3. 初始化数据提供器
         logger.info("初始化数据提供器...")
         self.data_provider = DataProvider(self.config)
+        self._event_bus = EventBus()
 
         # 4. 初始化叠加窗口
         logger.info("创建透明叠加窗口...")
@@ -289,13 +290,12 @@ class D3OverlayApp:
     def _collect_game_data(self) -> dict:
         """收集游戏相关数据"""
         events = self.data_provider.get_log_events()
-        bus = EventBus()
-        bus.process_log_events(events)
+        self._event_bus.process_log_events(events)
         return {
             'game_running': self.game_monitor.is_game_running(),
             'game_foreground': self.game_monitor.is_foreground(),
             'log_events': events,
-            'event_bus': bus,
+            'event_bus': self._event_bus,
             'timestamp': time.time(),
         }
 

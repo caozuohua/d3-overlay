@@ -66,7 +66,7 @@ class Plugin(PluginBase):
         except Exception:
             font = pygame.font.Font(None, 16)
 
-        text = "SkillCooldown: ready"
+        text = "SkillCooldown: 等待技能事件..."
         text_surf = font.render(text, True, (200, 220, 255))
         text_x = x + (panel_w - text_surf.get_width()) // 2
         text_y = y + (panel_h - text_surf.get_height()) // 2

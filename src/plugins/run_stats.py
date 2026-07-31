@@ -71,6 +71,8 @@ class Plugin(PluginBase):
             font = pygame.font.Font(None, 16)
 
         text = f"RunStats: {self._run_count} runs, {self._total_time:.0f}s"
+        if self._run_count == 0:
+            text = "RunStats: 等待游戏运行..."
         text_surf = font.render(text, True, (220, 255, 220))
         text_x = x + (panel_w - text_surf.get_width()) // 2
         text_y = y + (panel_h - text_surf.get_height()) // 2

@@ -181,11 +181,11 @@ class GameLogWatcher:
     def _find_log_path(self) -> Optional[str]:
         """自动定位 D3 日志文件
         
-        支持以下路径：
-        - 标准 Documents 文件夹
-        - OneDrive 同步的 Documents 文件夹
-        - 中文系统文档文件夹
-        - 游戏安装目录
+        按顺序检查：
+        1. 用户 docs 常见位置
+        2. OneDrive 同步的 docs
+        3. 注册表里的 D3 安装目录
+        4. 常见 Program Files 安装目录
         """
         # 构建候选路径列表
         user_profile = os.path.expanduser("~")
@@ -199,10 +199,11 @@ class GameLogWatcher:
             # 中文系统
             os.path.join(user_profile, "我的文档", "Diablo III", "Logs", "D3Debug.txt"),
             os.path.join(user_profile, "文档", "Diablo III", "Logs", "D3Debug.txt"),
-            # 游戏安装目录
-            "C:/Program Files (x86)/Diablo III/Logs/D3Debug.txt",
-            "C:/Program Files/Diablo III/Logs/D3Debug.txt",
         ]
+
+        # 把注册表里读到的安装目录也加进去（例如 D:\Games\Diablo III\Logs\D3Debug.txt）
+        for install_dir in self._find_d3_install_dirs():
+            candidates.append(os.path.join(install_dir, "Logs", "D3Debug.txt"))
 
         # 使用 Win32 API 获取实际 Documents 文件夹路径（最可靠）
         try:
@@ -244,8 +245,51 @@ class GameLogWatcher:
                 logger.info(f"找到 D3 日志文件: {path}")
                 return path
 
-        logger.warning("未找到 D3 日志文件，日志监控功能将不可用")
+        logger.warning(
+            "未找到 D3 日志文件，日志监控功能将不可用。"
+            "请确认游戏已开启日志记录，或在 config.json 的 data.log_path 手动指定 D3Debug.txt。"
+        )
         return None
+
+    def _find_d3_install_dirs(self) -> list:
+        """从注册表读取已知的 D3 安装目录。"""
+        dirs = []
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            HKEY_LOCAL_MACHINE = 0x80000002
+            KEY_READ = 0x20019
+            REG_SZ = 1
+
+            advapi32 = ctypes.windll.advapi32
+            kernel32 = ctypes.windll.kernel32
+
+            hkey = wintypes.HANDLE()
+            # 常见安装注册表路径
+            for subkey in [
+                r"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Diablo III",
+                r"SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Diablo III",
+            ]:
+                if advapi32.RegOpenKeyExW(
+                    HKEY_LOCAL_MACHINE, subkey, 0, KEY_READ, ctypes.byref(hkey)
+                ) == 0:
+                    buf = ctypes.create_unicode_buffer(512)
+                    buf_len = wintypes.DWORD(ctypes.sizeof(buf))
+                    data_type = wintypes.DWORD()
+                    if (
+                        advapi32.RegQueryValueExW(
+                            hkey, "InstallLocation", 0, ctypes.byref(data_type),
+                            ctypes.cast(buf, ctypes.POINTER(ctypes.c_byte)),
+                            ctypes.byref(buf_len)
+                        ) == 0
+                        and data_type.value == REG_SZ
+                    ):
+                        dirs.append(buf.value)
+                    advapi32.RegCloseKey(hkey)
+        except Exception:
+            pass
+        return dirs
 
     def poll_new_lines(self) -> list:
         """读取新增的日志行
@@ -396,6 +440,9 @@ class DataProvider:
         if log_path == 'auto':
             log_path = None
         self.log_watcher = GameLogWatcher(log_path)
+        self._use_demo_events = self.log_watcher.log_path is None
+        if self._use_demo_events:
+            logger.info("未检测到日志文件，启用 demo 事件注入用于调试")
 
         # 最近的事件
         self._recent_events = []
@@ -436,7 +483,24 @@ class DataProvider:
             # 保持事件列表大小
             if len(self._recent_events) > self._max_events:
                 self._recent_events = self._recent_events[-self._max_events:]
+        elif getattr(self, '_use_demo_events', False):
+            self._recent_events.extend(self._get_demo_events())
+            if len(self._recent_events) > self._max_events:
+                self._recent_events = self._recent_events[-self._max_events:]
         return self._recent_events
+
+    def _get_demo_events(self) -> list:
+        """在无真实日志时注入 demo 事件，保证面板可见变化。"""
+        now = time.time()
+        return [
+            {'type': 'new_game', 'raw': '[demo] new_game', 'timestamp': now},
+            {'type': 'rift_event', 'raw': '[demo] greater_rift', 'timestamp': now + 1, 'rift_type': 'greater_rift', 'rift_id': 'demo-1'},
+            {'type': 'rift_progress', 'raw': '[demo] progress 12', 'timestamp': now + 2, 'rift_type': 'greater_rift', 'progress': 0.12},
+            {'type': 'rift_progress', 'raw': '[demo] progress 35', 'timestamp': now + 3, 'rift_type': 'greater_rift', 'progress': 0.35},
+            {'type': 'nemesis', 'raw': '[demo] nemesis appear', 'timestamp': now + 4, 'status': 'appeared'},
+            {'type': 'rift_progress', 'raw': '[demo] progress 100', 'timestamp': now + 5, 'rift_type': 'greater_rift', 'progress': 1.0},
+            {'type': 'leave_game', 'raw': '[demo] leave_game', 'timestamp': now + 6},
+        ]
 
     def get_recent_events(self, event_type: str = None, count: int = 10) -> list:
         """获取最近的指定类型事件"""

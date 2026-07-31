@@ -61,7 +61,7 @@ class Plugin(PluginBase):
 
         # 结构化事件处理
         if event_type == 'nemesis':
-            nemesis_state = event.get('nemesis_state')
+            nemesis_state = event.get('nemesis_state') or event.get('status')
             if nemesis_state == 'appeared':
                 self._nemesis_state = 'appeared'
                 self._appear_time = time.time()
