@@ -483,10 +483,6 @@ class DataProvider:
             # 保持事件列表大小
             if len(self._recent_events) > self._max_events:
                 self._recent_events = self._recent_events[-self._max_events:]
-        elif getattr(self, '_use_demo_events', False):
-            self._recent_events.extend(self._get_demo_events())
-            if len(self._recent_events) > self._max_events:
-                self._recent_events = self._recent_events[-self._max_events:]
         return self._recent_events
 
     def _get_demo_events(self) -> list:

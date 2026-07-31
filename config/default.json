@@ -25,43 +25,43 @@
     "ocr_enabled": false
   },
   "plugins": {
-    "timer": {
-      "enabled": true,
-      "position": [20, 20]
-    },
-    "build_info": {
-      "enabled": true,
-      "position": [20, 120],
-      "require_api": false
-    },
-    "nemesis": {
-      "enabled": true,
-      "position": [20, 300]
-    },
-    "rift_info": {
-      "enabled": true,
-      "position": [20, 400]
-    },
-    "run_stats": {
-      "enabled": true,
-      "position": [20, 520]
-    },
-    "drop_tracker": {
-      "enabled": true,
-      "position": [20, 570]
-    },
-    "skill_cooldown": {
-      "enabled": true,
-      "position": [20, 620]
-    },
-    "boss_alert": {
-      "enabled": true,
-      "position": [20, 670]
-    },
-    "build_assistant": {
-      "enabled": true,
-      "position": [240, 20]
-    }
+  "timer": {
+  "enabled": false,
+  "position": [20, 20]
+  },
+  "build_info": {
+  "enabled": true,
+  "position": [20, 120],
+  "require_api": false
+  },
+  "nemesis": {
+  "enabled": true,
+  "position": [20, 300]
+  },
+  "rift_info": {
+  "enabled": true,
+  "position": [20, 400]
+  },
+  "run_stats": {
+  "enabled": false,
+  "position": [20, 520]
+  },
+  "drop_tracker": {
+  "enabled": false,
+  "position": [20, 570]
+  },
+  "skill_cooldown": {
+  "enabled": false,
+  "position": [20, 620]
+  },
+  "boss_alert": {
+  "enabled": true,
+  "position": [20, 670]
+  },
+  "build_assistant": {
+  "enabled": true,
+  "position": [240, 20]
+  }
   },
   "autoclicker": {
     "enabled": true,
