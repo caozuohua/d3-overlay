@@ -1,21 +1,236 @@
 {
   "meta": {
-    "source": "d3planner-sample + scraper-smoke",
-    "classes_count": 2,
-    "scraper_rows_count": 1
+    "source": "d3planner-sample + expanded-offline-dataset",
+    "classes_count": 7,
+    "scraper_rows_count": 1,
+    "generated_at": "2026-07-31"
   },
   "skills": {
     "barbarian": {
       "Bash": {
-        "name": "Bash"
+        "name": "Bash",
+        "level": 1,
+        "type": "active",
+        "description": "基础打击"
       },
       "Frenzy": {
-        "name": "Frenzy"
+        "name": "Frenzy",
+        "level": 1,
+        "type": "active",
+        "description": "持续攻击"
+      },
+      "Whirlwind": {
+        "name": "Whirlwind",
+        "level": 2,
+        "type": "active",
+        "description": "旋风斩"
+      },
+      "Charge": {
+        "name": "Charge",
+        "level": 3,
+        "type": "active",
+        "description": "冲锋"
+      },
+      "Seismic Slam": {
+        "name": "Seismic Slam",
+        "level": 4,
+        "type": "active",
+        "description": "地震猛击"
       }
     },
     "wizard": {
       "MagicMissile": {
         "name": "Magic Missile"
+      },
+      "Magic Missile": {
+        "name": "Magic Missile",
+        "level": 1,
+        "type": "active",
+        "description": "魔法飞弹"
+      },
+      "Shock Pulse": {
+        "name": "Shock Pulse",
+        "level": 1,
+        "type": "active",
+        "description": "震光脉冲"
+      },
+      "Ray of Frost": {
+        "name": "Ray of Frost",
+        "level": 2,
+        "type": "active",
+        "description": "冰锥光束"
+      },
+      "Frost Nova": {
+        "name": "Frost Nova",
+        "level": 3,
+        "type": "active",
+        "description": "霜爆新星"
+      },
+      "Blizzard": {
+        "name": "Blizzard",
+        "level": 4,
+        "type": "active",
+        "description": "暴风雪"
+      }
+    },
+    "demon-hunter": {
+      "Hungering Arrow": {
+        "name": "Hungering Arrow",
+        "level": 1,
+        "type": "active",
+        "description": "猎魔箭"
+      },
+      "Entangling Shot": {
+        "name": "Entangling Shot",
+        "level": 1,
+        "type": "active",
+        "description": "缠绕射击"
+      },
+      "Bolas": {
+        "name": "Bolas",
+        "level": 2,
+        "type": "active",
+        "description": "爆裂箭"
+      },
+      "Vault": {
+        "name": "Vault",
+        "level": 3,
+        "type": "active",
+        "description": "翻滚"
+      },
+      "Rapid Fire": {
+        "name": "Rapid Fire",
+        "level": 4,
+        "type": "active",
+        "description": "急速射击"
+      }
+    },
+    "monk": {
+      "Fists of Thunder": {
+        "name": "Fists of Thunder",
+        "level": 1,
+        "type": "active",
+        "description": "雷电拳"
+      },
+      "Deadly Reach": {
+        "name": "Deadly Reach",
+        "level": 1,
+        "type": "active",
+        "description": "远击破"
+      },
+      "Crippling Wave": {
+        "name": "Crippling Wave",
+        "level": 2,
+        "type": "active",
+        "description": " crippling wave"
+      },
+      "Way of the Hundred Fists": {
+        "name": "Way of the Hundred Fists",
+        "level": 3,
+        "type": "active",
+        "description": "百裂拳"
+      },
+      "Lashing Tail Kick": {
+        "name": "Lashing Tail Kick",
+        "level": 4,
+        "type": "active",
+        "description": "神龙摆尾"
+      }
+    },
+    "witch-doctor": {
+      "Summon Zombie Dogs": {
+        "name": "Summon Zombie Dogs",
+        "level": 1,
+        "type": "active",
+        "description": "召唤僵尸犬"
+      },
+      "Corpse Spiders": {
+        "name": "Corpse Spiders",
+        "level": 1,
+        "type": "active",
+        "description": "毒蜘蛛"
+      },
+      "Poison Dart": {
+        "name": "Poison Dart",
+        "level": 2,
+        "type": "active",
+        "description": "剧毒飞镖"
+      },
+      "Firebomb": {
+        "name": "Firebomb",
+        "level": 3,
+        "type": "active",
+        "description": "火焰炸弹"
+      },
+      "Hex": {
+        "name": "Hex",
+        "level": 4,
+        "type": "active",
+        "description": "妖术"
+      }
+    },
+    "necromancer": {
+      "Bone Spikes": {
+        "name": "Bone Spikes",
+        "level": 1,
+        "type": "active",
+        "description": "骨刺"
+      },
+      "Skeletal Mage": {
+        "name": "Skeletal Mage",
+        "level": 2,
+        "type": "active",
+        "description": "骨系法师"
+      },
+      "Command Skeletons": {
+        "name": "Command Skeletons",
+        "level": 2,
+        "type": "active",
+        "description": "指挥骷髅"
+      },
+      "Grim Scythe": {
+        "name": "Grim Scythe",
+        "level": 2,
+        "type": "active",
+        "description": " grim scythe"
+      },
+      "Death Nova": {
+        "name": "Death Nova",
+        "level": 4,
+        "type": "active",
+        "description": "死亡新星"
+      }
+    },
+    "crusader": {
+      "Punish": {
+        "name": "Punish",
+        "level": 1,
+        "type": "active",
+        "description": "惩戒"
+      },
+      "Shield Bash": {
+        "name": "Shield Bash",
+        "level": 1,
+        "type": "active",
+        "description": "盾牌猛击"
+      },
+      "Smite": {
+        "name": "Smite",
+        "level": 2,
+        "type": "active",
+        "description": "重击"
+      },
+      "Sweep Attack": {
+        "name": "Sweep Attack",
+        "level": 3,
+        "type": "active",
+        "description": "横扫"
+      },
+      "Blessed Shield": {
+        "name": "Blessed Shield",
+        "level": 4,
+        "type": "active",
+        "description": "圣盾"
       }
     }
   },
@@ -23,6 +238,71 @@
     {
       "name": "Whirlwind",
       "level": "12"
+    },
+    {
+      "name": "Whirlwind",
+      "level": "12",
+      "class": "barbarian"
+    },
+    {
+      "name": "Magic Missile",
+      "level": "1",
+      "class": "wizard"
+    },
+    {
+      "name": "Frost Nova",
+      "level": "4",
+      "class": "wizard"
+    },
+    {
+      "name": "Entangling Shot",
+      "level": "2",
+      "class": "demon-hunter"
+    },
+    {
+      "name": "Vault",
+      "level": "4",
+      "class": "demon-hunter"
+    },
+    {
+      "name": "Fists of Thunder",
+      "level": "1",
+      "class": "monk"
+    },
+    {
+      "name": "Way of the Hundred Fists",
+      "level": "4",
+      "class": "monk"
+    },
+    {
+      "name": "Poison Dart",
+      "level": "3",
+      "class": "witch-doctor"
+    },
+    {
+      "name": "Hex",
+      "level": "5",
+      "class": "witch-doctor"
+    },
+    {
+      "name": "Command Skeletons",
+      "level": "3",
+      "class": "necromancer"
+    },
+    {
+      "name": "Death Nova",
+      "level": "5",
+      "class": "necromancer"
+    },
+    {
+      "name": "Punish",
+      "level": "1",
+      "class": "crusader"
+    },
+    {
+      "name": "Blessed Shield",
+      "level": "5",
+      "class": "crusader"
     }
   ]
 }
