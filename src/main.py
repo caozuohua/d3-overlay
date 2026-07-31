@@ -344,6 +344,7 @@ class D3OverlayApp:
         """临时诊断：在叠加层左上角显示 10 秒 TEST 标记，确认像素管线是否出图。"""
         logger.info("热键: 叠加层诊断 TEST 标记 10s")
         self.overlay._debug_test_until = time.time() + 10
+        logger.info(f"_debug_test_until set to {self.overlay._debug_test_until}")
 
     def shutdown(self):
         """关闭应用"""
