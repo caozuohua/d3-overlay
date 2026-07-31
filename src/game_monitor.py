@@ -150,9 +150,10 @@ class GameMonitor:
 
     def _find_game_window(self):
         """查找游戏窗口"""
-        # 方法 1: 通过窗口类名查找（最快，不需要进程枚举）
+        # 方法 1: 通过窗口类名查找（最快），但必须二次校验 pid，避免把
+        # 历史残留/同名类窗口误判为“D3 仍在运行”。
         hwnd = user32.FindWindowW(D3_WINDOW_CLASS, None)
-        if hwnd:
+        if hwnd and self._is_d3_window(hwnd):
             return hwnd
 
         # 方法 2: 通过进程名查找窗口（需要进程枚举）
@@ -168,16 +169,49 @@ class GameMonitor:
                 return False  # 已找到，停止枚举
             if not user32.IsWindowVisible(hwnd):
                 return True
-            dw_pid = ctypes.c_ulong()
-            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(dw_pid))
-            if dw_pid.value in pids:
-                found_hwnd[0] = hwnd
-                return False
-            return True
+            if not self._is_d3_window(hwnd):
+                return True
+            found_hwnd[0] = hwnd
+            return False
 
         callback = EnumWindowsProc(enum_cb)
         user32.EnumWindows(callback, 0)
         return found_hwnd[0]
+
+    def _is_d3_window(self, hwnd) -> bool:
+        """校验窗口是否真属于 D3 进程。"""
+        if not hwnd:
+            return False
+        try:
+            dw_pid = ctypes.c_ulong()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(dw_pid))
+            if not dw_pid.value:
+                return False
+            return self._is_d3_process(dw_pid.value)
+        except Exception:
+            return False
+
+    def _is_d3_process(self, pid: int) -> bool:
+        """按 pid 回查进程名，判断是否 D3。"""
+        try:
+            import psutil
+            try:
+                proc = psutil.Process(pid)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                return False
+            name = (proc.name() or '').lower()
+            return name in {n.lower() for n in D3_PROCESS_NAMES}
+        except ImportError:
+            pass
+
+        # 无 psutil 时回退 Toolhelp32 全量枚举
+        if not TOOLHELP_AVAILABLE:
+            return False
+        try:
+            pids = self._find_game_pids()
+            return pid in pids
+        except Exception:
+            return False
 
     def _find_game_pids(self) -> set:
         """查找游戏进程 PID 集合"""
