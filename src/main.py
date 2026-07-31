@@ -315,6 +315,9 @@ class D3OverlayApp:
         timer = self.plugin_manager.plugins.get('Timer')
         if timer:
             timer.toggle()
+        # 临时诊断：复用 F9 也开启 TEST 标记，验证热键回调链路是否正常
+        self.overlay._debug_test_until = time.time() + 10
+        logger.info(f"_debug_test_until set to {self.overlay._debug_test_until}")
 
     def _on_toggle_autoclick(self):
         """切换自动点击"""
