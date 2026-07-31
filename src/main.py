@@ -216,6 +216,11 @@ class D3OverlayApp:
             'Ctrl+Shift+H',
             self._on_boss_key
         )
+        # 临时叠加层诊断：Ctrl+Shift+D 开启 10 秒左上角红框 TEST 标记
+        self.hotkey_manager.register(
+            'Ctrl+Shift+D',
+            self._on_debug_test_overlay
+        )
 
     def run(self):
         """主运行循环"""
@@ -334,6 +339,11 @@ class D3OverlayApp:
         logger.info("热键: 老板键，隐藏叠加层")
         self.overlay.user_hidden = True
         self.overlay.hide()
+
+    def _on_debug_test_overlay(self):
+        """临时诊断：在叠加层左上角显示 10 秒 TEST 标记，确认像素管线是否出图。"""
+        logger.info("热键: 叠加层诊断 TEST 标记 10s")
+        self.overlay._debug_test_until = time.time() + 10
 
     def shutdown(self):
         """关闭应用"""

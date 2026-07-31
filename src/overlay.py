@@ -552,6 +552,31 @@ class OverlayManager:
         self._sync_pygame_to_dib()
 
         try:
+            # 临时诊断：在左上角画一个 10 秒可见的 TEST 标记，用于确认像素管线是否真的在出图。
+            now = time.time()
+            if getattr(self, '_debug_test_until', 0) > now and self._pixels and self._width > 0 and self._height > 0:
+                try:
+                    buf = self._pixels
+                    # 在 (10,10) 到 (110,40) 区域画一个半透明红色矩形 + 黄色边框（BGRA）
+                    for y in range(10, 40):
+                        for x in range(10, 110):
+                            if 0 <= y < self._height and 0 <= x < self._width:
+                                idx = (y * self._width + x) * 4
+                                if y in (10, 39) or x in (10, 109):
+                                    # 黄色边框
+                                    buf[idx + 0] = 60
+                                    buf[idx + 1] = 220
+                                    buf[idx + 2] = 255
+                                    buf[idx + 3] = 230
+                                else:
+                                    # 红色填充
+                                    buf[idx + 0] = 200
+                                    buf[idx + 1] = 40
+                                    buf[idx + 2] = 60
+                                    buf[idx + 3] = 180
+                except Exception:
+                    pass
+
             user32 = ctypes.windll.user32
 
             AC_SRC_OVER = 0x00
