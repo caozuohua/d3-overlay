@@ -272,6 +272,7 @@ class D3OverlayApp:
                 # 渲染
                 self.overlay.begin_frame()
                 self.plugin_manager.render_all(self.overlay.get_surface())
+                self._draw_debug_overlay_test()
                 self.overlay.end_frame()
 
                 # 更新自动点击器
@@ -342,6 +343,25 @@ class D3OverlayApp:
         logger.info("热键: 老板键，隐藏叠加层")
         self.overlay.user_hidden = True
         self.overlay.hide()
+
+    def _draw_debug_overlay_test(self):
+        """临时诊断：在内部 pygame 渲染面左上角画 TEST 文本。"""
+        try:
+            now = time.time()
+            if getattr(self.overlay, '_debug_test_until', 0) <= now:
+                return
+            surface = self.overlay.get_surface()
+            if not surface:
+                return
+            import pygame
+            font = pygame.font.Font(None, 64)
+            text = font.render("TEST", True, (255, 60, 60))
+            surface.blit(text, (20, 20))
+            font_small = pygame.font.Font(None, 20)
+            sub = font_small.render("overlay render OK", True, (255, 220, 80))
+            surface.blit(sub, (20, 90))
+        except Exception as e:
+            logger.error(f"debug overlay test draw failed: {e}")
 
     def _on_debug_test_overlay(self):
         """临时诊断：在叠加层左上角显示 10 秒 TEST 标记，确认像素管线是否出图。"""
