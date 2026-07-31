@@ -155,6 +155,8 @@ class D3OverlayApp:
             logger.error("  3. 尝试以管理员身份运行一次（仅首次）")
             return False
         logger.info("叠加窗口创建成功")
+        if not self.config.get('overlay.follow_game_window', True):
+            self.overlay.show()
 
         # 5. 初始化插件系统
         logger.info("加载插件...")

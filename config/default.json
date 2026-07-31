@@ -41,6 +41,26 @@
     "rift_info": {
       "enabled": true,
       "position": [20, 400]
+    },
+    "run_stats": {
+      "enabled": true,
+      "position": [20, 520]
+    },
+    "drop_tracker": {
+      "enabled": true,
+      "position": [20, 570]
+    },
+    "skill_cooldown": {
+      "enabled": true,
+      "position": [20, 620]
+    },
+    "boss_alert": {
+      "enabled": true,
+      "position": [20, 670]
+    },
+    "build_assistant": {
+      "enabled": true,
+      "position": [240, 20]
     }
   },
   "autoclicker": {
